@@ -1,0 +1,56 @@
+* How to write Web UI
+  The user writes *clojure* code:
+  #+begin_src clojure
+       (def +button+ (button :action (action :name "Send" :handler (fn [e] (alert "You pressed a button")))))
+  #+end_src
+  The above results in a new record instance =Button=. It may be converted into HTML code using:
+  #+begin_src clojure
+       (html +button+)
+  #+end_src
+  This will return HTML code which creates a Button using Google
+  Closure. Upon pressing the Button, =alert= is being executed *inside the users browser*.
+
+  Now consider the following example, which does the same thing, but in a different way:
+  #+begin_src clojure
+    (def +button+ (button :action (action :name "Send" :server-handler (fn [e] (eval-on-client (alert "You pressed a button"))))))
+  #+end_src
+  The above results in a new record instance =Button=. It may be converted into HTML code using:
+  #+begin_src clojure
+       (html +button+)
+  #+end_src
+  Again, it returns HTML code for a Button using Google Closure. When
+  the user presses the button, the following happens:
+  1. The browser establishes a connection with the server (if not already done)
+  2. The browser sends an event to the server, specifying that the button has been pressed
+  3. The clojure function given to :server-handler is being executed.
+  4. The function uses =eval-on-client= to send code to be eval'ed to the browser
+     1. The code inside the body of =eval-on-client= is being compiled to js
+     2. The server sends an event to the browser with the compiled js code
+     3. The browser calls =eval= on that code
+
+
+  Now consider the following:
+  #+begin_src clojure
+       (def +button+ (button :action (action :name "Send" :handler (fn [e] (alert "You pressed a button")))))
+  #+end_src
+  Once the button has been sent to the browser, we can easily change its background color *from the server*:
+  #+begin_src clojure
+    (config! +button+ :background "#FFFFFF")
+  #+end_src
+  This will do the right thing: Eval =(config! +button+ :background "#FFFFFF")= (compiled to js) on the browser.
+* NOTES
+** ClojureScript minifies & optimizes code
+   This means we cannot use it for "compiling" code before sending it
+   to the browser. That would obscure the code & the browser would not
+   know what to do with it.  We should only *build the javascript
+   part* (i.e. the seesaw API) of the UI library using ClojureScript.
+  #+begin_src clojure
+    (build '(do (ns teeter-totter) (defn ^:export dialog [] ))
+           {:optimizations :advanced :output-dir "static/js-out" :output-to "static/js-out/latest" })
+  #+end_src
+   Then we could use a conventional clojure->js library
+   (e.g. scriptjure or clojurejs) to pass code to be evaluated to the browser.  This
+   still enables optimization of large parts of the JavaScript code,
+   while keeping the UI API alive for use in dynamic code (which is
+   passed to the browser).
+
