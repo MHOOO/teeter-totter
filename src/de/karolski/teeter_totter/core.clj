@@ -74,24 +74,50 @@
 ;; ,[1,["b"]\n
 ;; ]\n
 ;; ]\n
-(defn gen-xhr-response [data]
+(defn gen-xhr-response
+  "Generate and return an XHR Response with the specified DATA which
+  the Google Closure BrowserChannel can understand. "
+  [data]
   (let [encoded-data (json/encode (map-indexed (fn [i d] [i d]) data))]
     (str (count encoded-data) "\n" encoded-data)))
 
-(defn gen-session-id []
+(defn gen-session-id
+  "Generate a random session id."
+  []
   (reduce str "" (repeatedly 16 (partial rand-int 10))))
 
-(def +sessions+ (ref {}))
-
-(defn gen-session-create-response [& {:keys [version host-prefix] :or {version 8 host-prefix ""}}]
-  (dosync
-   (alter +sessions+ #(assoc % (gen-session-id)
-                             {:last-active (System/nanoTime)
-                              :last-response-array-id 0
-                              :outstanding-backchannel-bytes 0}))
-   (gen-xhr-response [["c" (gen-session-id) host-prefix version]])))
+(def ^{:doc "Ref containing a map of all sessions. Where keys are
+session ids and keys are client maps."} +sessions+ (ref {}))
 
 (defonce +channel+ (channel))
+
+(defn gen-client
+  "Generate and return a new client map."
+  [& {:keys [sid version host-prefix] :or {version 8 host-prefix ""}}]
+  {:last-active (System/nanoTime)
+   :sid (or sid (gen-session-id))
+   :version version
+   :host-prefix host-prefix
+   :last-response-array-id 0
+   :outstanding-backchannel-bytes 0})
+
+(defn gen-session-create-response
+  "Generate a response for session creation which the Google Closure
+  BrowserChannel can understand."
+  [client]
+  (gen-xhr-response [["c" (:sid client) (:host-prefix client) (:version client)]]))
+
+(defn get-client
+  "Get the client with the specified session id. If no such client
+  given, create one."
+  ([] (get-client (gen-session-id)))
+  ([sid]
+     (or (@+sessions+ sid)
+         (do (dosync
+              (alter +sessions+
+                     (fn [sessions]
+                       (assoc sessions sid (gen-client :sid sid)))))
+             (get-client sid)))))
 
 (defroutes main-routes
   (GET "/" [] (html (render-main)))
@@ -106,20 +132,19 @@
             ;; seconds, so the browser can figure out whether it is
             ;; behind a buffering proxy or not
             (xmlhttp-chunk-seq :wait 200)
-            ;; (java.io.StringBufferInputStream. "111113")
             )))
   ;; forward channel
   (POST "/channel/channel" [& args]
         ;; TODO: Process the input map from the client
         (if (not (args "SID"))
           ;; create session for user
-          (gen-session-create-response)
+          (gen-session-create-response (get-client))
           
           ;; Send client backchannel information
-          (let [user-map (@+sessions+ (args "SID"))
+          (let [client (get-client (args "SID"))
                 data (json/encode [1 ;; 1=backchannel present, 0=no backchannel
-                                   (user-map :last-response-array-id)
-                                   (user-map :outstanding-backchannel-bytes)])]
+                                   (:last-response-array-id client)
+                                   (:outstanding-backchannel-bytes client)])]
             (str (count data) "\n" data))))
   ;; backward channel, this should ideally be a long-lived channel
   (GET "/channel/channel" [& args]
