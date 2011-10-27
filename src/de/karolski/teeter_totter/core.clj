@@ -1,5 +1,5 @@
 (ns de.karolski.teeter-totter.core
-  (:use (clojure.contrib [logging :only (error warn info with-logs)])
+  (:use (clojure.tools [logging :only (debug error warn info with-logs)])
         compojure.core
         hiccup.core
         hiccup.page-helpers
@@ -11,37 +11,55 @@
             [org.danlarkin [json :as json]]))
 
 
+;; build core.cljs to test out clojurescript
+(build "src/de/karolski/teeter_totter"
+       {:optimizations :advanced
+        :output-to "static/js-out/hello/hello.js" })
+
 (defn render-main []
   [:html
    [:head
     [:script {:type "text/javascript" :src "/static/closure-library/closure/goog/base.js"}]
-    (script
-     (goog.require "goog.net.BrowserChannel")
-     (goog.require "goog.debug.Logger")
-     (goog.require "goog.debug.Console")
-     (goog.require "goog.json")
-     (goog.require "goog.dom")
-     (defn say-hi []
-       (let [bc (new goog.net.BrowserChannel 8)
-             handler (new goog.net.BrowserChannel.Handler)
-             log (new goog.debug.Logger.getLogger "Local") 
-             console (new goog.debug.Console)]
-         ;; enable logging into firebug
-         (.setCapturing console true)
-         ;; remove stuff from browserchannel
-         (.addFilter console "goog.net.BrowserChannel")
-         (set! handler.channelOpened (fn [bc] (.info log "Channel Opened")))
-         (set! handler.channelClosed (fn [bc pending-maps undelivered-maps] (.info log "Channel Closed")))
-         (set! handler.channelError (fn [bc error] (.info log (+ "Channel Error:" error))))
-         (set! handler.channelHandleArray
-               (fn [bc array]
-                 (.info log (+ "Channel Handle Array:" array))
-                 (.sendMap bc {:result (goog.json.serialize (eval array))})))
-         (.info log "test")
-         (.setHandler bc handler)
-         (.connect bc "channel/test" "channel/channel" {})))
-     )]
-   [:body {:onload (js (say-hi))}
+    [:script {:type "text/javascript" :src "/static/js-out/hello/hello.js"}]
+    [:link {:rel "stylesheet" :href "/static/css/common.css"}]
+    [:link {:rel "stylesheet" :href "/static/css/button.css"}]
+    [:link {:rel "stylesheet" :href "/static/css/menubutton.css"}]
+    [:link {:rel "stylesheet" :href "/static/css/colormenubutton.css"}]
+    (with-pretty-print
+     (script
+      (goog.require "goog.net.BrowserChannel")
+      (goog.require "goog.debug.Logger")
+      (goog.require "goog.debug.Console")
+      (goog.require "goog.json")
+      (goog.require "goog.dom")
+      (goog.require "de.karolski.teeter_totter.core")
+      (defn setup-connection []
+        (let [bc (new goog.net.BrowserChannel 8)
+              handler (new goog.net.BrowserChannel.Handler)
+              log (new goog.debug.Logger.getLogger "Local") 
+              console (new goog.debug.Console)]
+          ;; enable logging into firebug
+          (.setCapturing console true)
+          ;; remove stuff from browserchannel
+          (.addFilter console "goog.net.BrowserChannel")
+
+          ;; setup events
+          (set! handler.channelOpened (fn [bc] (.info log "Channel Opened")))
+          (set! handler.channelClosed (fn [bc pending-maps undelivered-maps] (.info log "Channel Closed")))
+          (set! handler.channelError (fn [bc error] (.info log (+ "Channel Error:" error))))
+
+          ;; handle code by evaluating it and sending the result back to the client
+          (set! handler.channelHandleArray
+                (fn [bc array]
+                  (.info log (+ "Channel Handle Array:" array))
+                  (.sendMap bc {:result (goog.json.serialize (eval array))})))
+          (.info log "test")
+          (.setHandler bc handler)
+          (.connect bc "channel/test" "channel/channel" {})))))]
+   [:body {:onload
+           (js (setup-connection)
+               ;; invoke function which has been build using clojurescript
+               (de.karolski.teeter-totter.core.main))}
     [:div#logdiv]]])
 
 ;; (defn xmlhttp-chunk-seq [& {:keys [wait] :or {wait 2000}}]
@@ -97,6 +115,7 @@ session ids and keys are client maps."} +sessions+ (ref {}))
 (defn add-session
   "Add a session to the session map. It must have a :sid key."
   [sess]
+  (debug "Adding session: " sess)
   (enqueue +session-recv-channel+ sess)
   sess)
 
@@ -115,9 +134,27 @@ session ids and keys are client maps."} +sessions+ (ref {}))
             (let [keys (map :sid (filter #(< (+ (:last-active %) 60e9)
                                              (System/nanoTime))
                                          (vals sessions)))]
-              (println "Removing sessions:" keys)
+              (if (not (empty? keys))
+                (println "Removing sessions:" keys))
               (apply dissoc sessions
                      keys))))))
+
+;; the global channel. Anything sent to it will go to any client
+(def +broadcast-channel+ (permanent-channel))
+
+(defn broadcast-eval*
+  "Evaluate the javascript code given as a string on *all* connected clients
+  browsers."
+  [js-str]
+  (enqueue +broadcast-channel+ [js-str])
+  ;; ensure the result is popped from the forward channel
+  (doseq [ch (map :forward-channel (vals (sessions)))]
+    (receive ch identity)))
+
+(defmacro broadcast-eval
+  "Like BROADCAST-EVAL*, but wraps BODY inside a (js ...) form."
+  [& body]
+  `(broadcast-eval* (js ~@body)))
 
 (receive-all
  +session-recv-channel+
@@ -136,28 +173,29 @@ session ids and keys are client maps."} +sessions+ (ref {}))
                 (reset! +ping-thread-active+ false)
                 (broadcast-eval "noop")))))))
 
-;; the global channel. Anything sent to it will go to any client
-(def +broadcast-channel+ (permanent-channel))
+(defn update-client
+  "Update the client with the specified session id using the function f."
+  [sid f]
+  (dosync
+   (alter +sessions+ (fn [session] (update-in session [sid] f)))))
 
 (defn gen-client
   "Generate and return a new client map."
   [& {:keys [sid version host-prefix] :or {version 8 host-prefix ""}}]
-  {:last-active (System/nanoTime)
-   :sid (or sid (gen-session-id))
-   :version version
-   :host-prefix host-prefix
-   :last-response-array-id 0
-   :forward-channel (channel) ;; the channel from client -> server
-   :backward-channel (doto (channel)
-                       (->> #_ch
-                        (siphon +broadcast-channel+))) ;; the channel from server -> client
-   :outstanding-backchannel-bytes 0})
-
-(defn gen-session-create-response
-  "Generate a response for session creation which the Google Closure
-  BrowserChannel can understand."
-  [client]
-  (gen-xhr-response [["c" (:sid client) (:host-prefix client) (:version client)]]))
+  (let [sid (or sid (gen-session-id))
+        fc (doto (channel)
+             (receive-all (fn [_] (update-client sid (fn [client] (assoc client :last-active (System/nanoTime))))))
+             )]
+    {:last-active (System/nanoTime)
+     :sid sid
+     :version version
+     :host-prefix host-prefix
+     :last-response-array-id 0
+     :forward-channel fc ;; the channel from client -> server
+     :backward-channel (doto (channel)
+                         (->> #_ch
+                              (siphon +broadcast-channel+))) ;; the channel from server -> client
+     :outstanding-backchannel-bytes 0}))
 
 (defn get-client
   "Get the client with the specified session id. If no such client
@@ -167,11 +205,11 @@ session ids and keys are client maps."} +sessions+ (ref {}))
      (or (get (sessions) sid)
          (add-session (gen-client :sid sid)))))
 
-(defn update-client
-  "Update the client with the specified session id using the function f."
-  [sid f]
-  (dosync
-   (alter +sessions+ (fn [session] (update-in session [sid] f)))))
+(defn gen-session-create-response
+  "Generate a response for session creation which the Google Closure
+  BrowserChannel can understand."
+  [client]
+  (gen-xhr-response [["c" (:sid client) (:host-prefix client) (:version client)]]))
 
 (defn eval-on-client*
   "Evaluate the javascript code given as a string on the clients
@@ -197,23 +235,47 @@ session ids and keys are client maps."} +sessions+ (ref {}))
   [client & body]
   `(reval-on-client* ~client (js ~@body)))
 
-(defn broadcast-eval*
-  "Evaluate the javascript code given as a string on *all* connected clients
-  browsers."
-  [js-str]
-  (enqueue +broadcast-channel+ [js-str])
-  ;; ensure the result is popped from the forward channel
-  (doseq [ch (map :forward-channel (vals (sessions)))]
-    (receive ch identity)))
 
-(defmacro broadcast-eval
-  "Like BROADCAST-EVAL*, but wraps BODY inside a (js ...) form."
-  [& body]
-  `(broadcast-eval* (js ~@body)))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; HTML Widgets
+(defprotocol Configurable
+  (config!* [target args] "Configure one or more options on target. Args is a list of key/value pairs. See (seesaw.core/config!)")
+  (config* [target name] "Retrieve the current value for the given named option. See (seesaw.core/config)"))
+
+(defn config! [widget & args]
+  (config!* widget args))
+
+(defn config [widget name]
+  (config* widget name))
+
+(defprotocol AWidget
+  (to-html* [_] "Return HTML code for the widget."))
+
+(defn to-html [widget] (to-html* widget))
+
+(defrecord Button [caption-ref]
+  AWidget
+  (to-html* [_] (js (goog.ui.ColorButton. caption)))
+  Configurable
+  (config!* [_ args] ;; (eval-on-client )
+            ))
+
+(defn button [& args]
+  (Button. nil))
 
 (defroutes main-routes
   (GET "/" [] (html (render-main)))
-  ;; testing the connection
+  ;; (comment
+  ;;   (GET "demo/:sid" [sid]
+  ;;        ;; this will either create the below UI, or restore an
+  ;;        ;; already created UI
+  ;;        (restore-or-create
+  ;;         (get-client sid)
+  ;;         ;; create a UI
+  ;;         (dialog :content (button :action (fn (alert "Blub")))))))
+
+  ;;;;; BrowserChannel API
+  ;;; testing the connection
   (GET "/channel/test" [& args]
        (do (println args) 
            (cond
@@ -223,9 +285,8 @@ session ids and keys are client maps."} +sessions+ (ref {}))
             ;; we have to send 2 chunks of data with a wait time of 2
             ;; seconds, so the browser can figure out whether it is
             ;; behind a buffering proxy or not
-            (xmlhttp-chunk-seq :wait 200)
-            )))
-  ;; forward channel
+            (xmlhttp-chunk-seq :wait 200))))
+  ;;; forward channel
   (POST "/channel/channel" [& args]
         (let [client (if (args "SID") (get-client (args "SID")) (get-client))
               data (reduce merge {} 
@@ -249,13 +310,13 @@ session ids and keys are client maps."} +sessions+ (ref {}))
                                      ;; TODO: This is not yet updated inside the backward channel!
                                      (:outstanding-backchannel-bytes client)])]
               (str (count data) "\n" data)))))
-  ;; backward channel, this should ideally be a long-lived channel
+  ;;; backward channel, this should ideally be a long-lived channel
   (GET "/channel/channel" [& args]
        (let [client (get-client (args "SID"))]
          (map #(dosync
                 (let [id (:last-response-array-id client)]
-                 (update-client (:sid client) (fn [client] (update-in client [:last-response-array-id] inc)))
-                 (gen-xhr-response % :start-index id)))
+                  (update-client (:sid client) (fn [client] (update-in client [:last-response-array-id] inc)))
+                  (gen-xhr-response % :start-index id)))
               (lazy-channel-seq (:backward-channel client)))))
   (route/files "/static" {:root "./static"})
   (route/not-found "Page not found"))

@@ -1,3 +1,6 @@
+* What we want
+  Simple: an API for manipulating Google UI elements (inside a clients
+  browser) from within clojure (running on the server).
 * How to write Web UI
   The user writes *clojure* code:
   #+begin_src clojure
@@ -54,3 +57,9 @@
    while keeping the UI API alive for use in dynamic code (which is
    passed to the browser).
 
+* Implementation
+
+** TODO Seesaw API on ClojureScript
+   Basically this involves partly porting the Seesaw API to ClojureScript.
+   - [ ] frame(?)/panel/dialog
+   - [ ] button/radio/checkbox
