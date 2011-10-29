@@ -13,7 +13,8 @@
 
 ;; build core.cljs to test out clojurescript
 (build "src/de/karolski/teeter_totter"
-       {:optimizations :advanced
+       {:optimizations :whitespace
+        ;:optimizations :advanced
         :output-to "static/js-out/hello/hello.js" })
 
 (defn render-main []
@@ -27,13 +28,14 @@
     [:link {:rel "stylesheet" :href "/static/css/colormenubutton.css"}]
     (with-pretty-print
      (script
-      (goog.require "goog.net.BrowserChannel")
-      (goog.require "goog.debug.Logger")
-      (goog.require "goog.debug.Console")
-      (goog.require "goog.json")
-      (goog.require "goog.dom")
+      ;; (goog.require "goog.net.BrowserChannel")
+      ;; (goog.require "goog.debug.Logger")
+      ;; (goog.require "goog.debug.Console")
+      ;; (goog.require "goog.json")
+      ;; (goog.require "goog.dom")
       (goog.require "de.karolski.teeter_totter.core")
       (defn setup-connection []
+        ;; this here works, but it should be moved to teeter_totter.core
         (let [bc (new goog.net.BrowserChannel 8)
               handler (new goog.net.BrowserChannel.Handler)
               log (new goog.debug.Logger.getLogger "Local") 
@@ -41,7 +43,7 @@
           ;; enable logging into firebug
           (.setCapturing console true)
           ;; remove stuff from browserchannel
-          (.addFilter console "goog.net.BrowserChannel")
+          ;; (.addFilter console "goog.net.BrowserChannel")
 
           ;; setup events
           (set! handler.channelOpened (fn [bc] (.info log "Channel Opened")))
@@ -55,12 +57,15 @@
                   (.sendMap bc {:result (goog.json.serialize (eval array))})))
           (.info log "test")
           (.setHandler bc handler)
-          (.connect bc "channel/test" "channel/channel" {})))))]
+          (.connect bc "channel/test" "channel/channel" {})))
+      ))]
    [:body {:onload
            (js (setup-connection)
-               ;; invoke function which has been build using clojurescript
-               (de.karolski.teeter-totter.core.main))}
-    [:div#logdiv]]])
+            ;; invoke function which has been build using clojurescript
+            (goog.require "de.karolski.teeter_totter.core")
+            (de.karolski.teeter-totter.core.main))}
+    [:div#logdiv]
+    [:div#dialog]]])
 
 ;; (defn xmlhttp-chunk-seq [& {:keys [wait] :or {wait 2000}}]
 ;;   (let [c (ref "111112")]
@@ -265,19 +270,19 @@ session ids and keys are client maps."} +sessions+ (ref {}))
 
 (defroutes main-routes
   (GET "/" [] (html (render-main)))
-  ;; (comment
-  ;;   (GET "demo/:sid" [sid]
-  ;;        ;; this will either create the below UI, or restore an
-  ;;        ;; already created UI
-  ;;        (restore-or-create
-  ;;         (get-client sid)
-  ;;         ;; create a UI
-  ;;         (dialog :content (button :action (fn (alert "Blub")))))))
+  ;; (GET "demo/:sid" [sid]
+  ;;      ;; this will either create the below UI, or restore an
+  ;;      ;; already created UI
+  ;;      (restore-or-create
+  ;;        (get-client sid)
+  ;;        ;; create a UI
+  ;;        (let [d (dialog :content (button :action (fn (alert "Blub"))))]
+  ;;          (config! :title "Login"))))
 
-  ;;;;; BrowserChannel API
-  ;;; testing the connection
+;;;;; BrowserChannel API
+;;; testing the connection
   (GET "/channel/test" [& args]
-       (do (println args) 
+       (do (println "Args:" args) 
            (cond
             (= (args "MODE") "init") (json/encode ["",""])
             (= (args "TYPE") "xmlhttp")
@@ -285,8 +290,9 @@ session ids and keys are client maps."} +sessions+ (ref {}))
             ;; we have to send 2 chunks of data with a wait time of 2
             ;; seconds, so the browser can figure out whether it is
             ;; behind a buffering proxy or not
-            (xmlhttp-chunk-seq :wait 200))))
-  ;;; forward channel
+            (xmlhttp-chunk-seq :wait 200)))
+       )
+;;; forward channel
   (POST "/channel/channel" [& args]
         (let [client (if (args "SID") (get-client (args "SID")) (get-client))
               data (reduce merge {} 
@@ -310,7 +316,7 @@ session ids and keys are client maps."} +sessions+ (ref {}))
                                      ;; TODO: This is not yet updated inside the backward channel!
                                      (:outstanding-backchannel-bytes client)])]
               (str (count data) "\n" data)))))
-  ;;; backward channel, this should ideally be a long-lived channel
+;;; backward channel, this should ideally be a long-lived channel
   (GET "/channel/channel" [& args]
        (let [client (get-client (args "SID"))]
          (map #(dosync
