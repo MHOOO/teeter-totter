@@ -25,7 +25,9 @@
    [:head
     [:script {:type "text/javascript" :src "/static/closure-library/closure/goog/base.js"}]
     [:script {:type "text/javascript" :src "/static/js-out/hello/hello.js"}]
+    ;; TODO: these should be added automatically depending on what is being used
     [:link {:rel "stylesheet" :href "/static/css/common.css"}]
+    [:link {:rel "stylesheet" :href "/static/css/dialog.css"}]
     [:link {:rel "stylesheet" :href "/static/css/button.css"}]
     [:link {:rel "stylesheet" :href "/static/css/menubutton.css"}]
     [:link {:rel "stylesheet" :href "/static/css/colormenubutton.css"}]
@@ -68,8 +70,7 @@
             ;; invoke function which has been build using clojurescript
             (goog.require "de.karolski.teeter_totter.core")
             (de.karolski.teeter-totter.core.main))}
-    [:div#logdiv]
-    [:div#dialog]]])
+    [:div#logdiv]]])
 
 ;; (defn xmlhttp-chunk-seq [& {:keys [wait] :or {wait 2000}}]
 ;;   (let [c (ref "111112")]
