@@ -14,8 +14,10 @@
 
 ;; build core.cljs to test out clojurescript
 (build "src/de/karolski/teeter_totter"
-       {:optimizations :whitespace
+       {;:optimizations :whitespace
         ;:optimizations :advanced
+        :optimizations :simple
+        :pretty-print true
         :output-to "static/js-out/hello/hello.js" })
 
 (defn render-main []
@@ -46,6 +48,7 @@
           ;; remove stuff from browserchannel
           ;; (.addFilter console "goog.net.BrowserChannel")
 
+          (.info log bc)
           ;; setup events
           (set! handler.channelOpened (fn [bc] (.info log "Channel Opened")))
           (set! handler.channelClosed (fn [bc pending-maps undelivered-maps] (.info log "Channel Closed")))
@@ -61,7 +64,7 @@
           (.connect bc "channel/test" "channel/channel" {})))
       ))]
    [:body {:onload
-           (js (setup-connection)
+           (js ;; (setup-connection)
             ;; invoke function which has been build using clojurescript
             (goog.require "de.karolski.teeter_totter.core")
             (de.karolski.teeter-totter.core.main))}
@@ -282,18 +285,15 @@ session ids and keys are client maps."} +sessions+ (ref {}))
 
 ;;;;; BrowserChannel API
 ;;; testing the connection
-  (GET "/channel/test" request
-       (let [{query-string :query-string} request
-             {args :params} request]
-        (do (println "Request:" request) 
-            (cond
-             (= (args "MODE") "init") (json/encode ["",""])
-             (= (args "TYPE") "xmlhttp")
+  (GET "/channel/test" [& args]
+       (cond
+        (= (args "MODE") "init") (json/encode ["",""])
+        (= (args "TYPE") "xmlhttp")
 
-             ;; we have to send 2 chunks of data with a wait time of 2
-             ;; seconds, so the browser can figure out whether it is
-             ;; behind a buffering proxy or not
-             (xmlhttp-chunk-seq :wait 200)))))
+        ;; we have to send 2 chunks of data with a wait time of 2
+        ;; seconds, so the browser can figure out whether it is
+        ;; behind a buffering proxy or not
+        (xmlhttp-chunk-seq :wait 200)))
 ;;; forward channel
   (POST "/channel/channel" [& args]
         (let [client (if (args "SID") (get-client (args "SID")) (get-client))

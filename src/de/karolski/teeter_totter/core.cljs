@@ -62,7 +62,7 @@
     (set! handler.channelHandleArray
           (fn [bc array]
             (.info log (+ "Channel Handle Array:" array))
-            (.sendMap bc {:result (gjson/serialize (eval array))})))
+            (.sendMap bc (jsObj {:result (gjson/serialize (js/eval array))}))))
     (.info log "Connecting to server through BrowserChannel")
     (.setHandler bc handler)
     (.connect bc "channel/test" "channel/channel" (jsObj {}))))
