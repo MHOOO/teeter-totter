@@ -4,6 +4,7 @@
         hiccup.core
         hiccup.page-helpers
         ring.adapter.jetty
+        [ring.middleware.params :only [wrap-params]]
         [clojurejs.js :only (js script with-pretty-print)]
         [cljs.closure :only (build)]
         lamina.core)
@@ -281,17 +282,18 @@ session ids and keys are client maps."} +sessions+ (ref {}))
 
 ;;;;; BrowserChannel API
 ;;; testing the connection
-  (GET "/channel/test" [& args]
-       (do (println "Args:" args) 
-           (cond
-            (= (args "MODE") "init") (json/encode ["",""])
-            (= (args "TYPE") "xmlhttp")
+  (GET "/channel/test" request
+       (let [{query-string :query-string} request
+             {args :params} request]
+        (do (println "Request:" request) 
+            (cond
+             (= (args "MODE") "init") (json/encode ["",""])
+             (= (args "TYPE") "xmlhttp")
 
-            ;; we have to send 2 chunks of data with a wait time of 2
-            ;; seconds, so the browser can figure out whether it is
-            ;; behind a buffering proxy or not
-            (xmlhttp-chunk-seq :wait 200)))
-       )
+             ;; we have to send 2 chunks of data with a wait time of 2
+             ;; seconds, so the browser can figure out whether it is
+             ;; behind a buffering proxy or not
+             (xmlhttp-chunk-seq :wait 200)))))
 ;;; forward channel
   (POST "/channel/channel" [& args]
         (let [client (if (args "SID") (get-client (args "SID")) (get-client))
@@ -327,4 +329,6 @@ session ids and keys are client maps."} +sessions+ (ref {}))
   (route/files "/static" {:root "./static"})
   (route/not-found "Page not found"))
 
-(defonce jetty* (future (run-jetty (var main-routes) {:port 8080})))
+(def wrapped-main-routes (wrap-params main-routes))
+
+(defonce jetty* (future (run-jetty (var wrapped-main-routes) {:port 8080})))
