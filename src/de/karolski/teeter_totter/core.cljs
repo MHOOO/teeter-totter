@@ -103,6 +103,50 @@
   (when val
     (config! c key val)))
 
+(defn generic-configure!
+  [c argmap]
+  (doseq [[k v] argmap]
+    (when (k (config-map c))
+      (config! c k v))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Listen API
+(defn event-kw->google-event
+  [event-kw]
+  (event-kw
+   ;; TODO: sync with seesaw event names
+   {:leave goog.ui.Component.EventType.LEAVE
+    :open goog.ui.Component.EventType.OPEN
+    :uncheck goog.ui.Component.EventType.UNCHECK
+    :focus goog.ui.Component.EventType.FOCUS
+    :hide goog.ui.Component.EventType.HIDE
+    :deactivate goog.ui.Component.EventType.DEACTIVATE
+    :close goog.ui.Component.EventType.CLOSE
+    :unhighlight goog.ui.Component.EventType.UNHIGHLIGHT
+    :highlight goog.ui.Component.EventType.HIGHLIGHT
+    :activate goog.ui.Component.EventType.ACTIVATE
+    :unselect goog.ui.Component.EventType.UNSELECT
+    :enter goog.ui.Component.EventType.ENTER
+    :before-show goog.ui.Component.EventType.BEFORE_SHOW
+    :enable goog.ui.Component.EventType.ENABLE
+    :check goog.ui.Component.EventType.CHECK
+    :show goog.ui.Component.EventType.SHOW
+    :select goog.ui.Component.EventType.SELECT
+    :action goog.ui.Component.EventType.ACTION
+    :change goog.ui.Component.EventType.CHANGE
+    :blur goog.ui.Component.EventType.BLUR
+    :disable goog.ui.Component.EventType.DISABLE}))
+
+(defn listen
+  ([c] c)
+  ([c event-kw handler]
+     (doto c
+       (goog.events.listen (event-kw->google-event event-kw) handler)))
+  ([c & more]
+     (doseq [[event-kw handler] (partition 2 more)]
+       (listen c event-kw handler))))
+
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -111,7 +155,12 @@
 
 
 (def +component-opt-map+
-     {:visible? [#(.getVisible %1) #(.setVisible %1 %2)]})
+     {:listen [(fn [e] (debug "NOT IMPLEMENTED!") nil) #(apply listen %1 %2)]
+      :visible? [#(.getVisible %1) #(.setVisible %1 %2)]})
+
+(def +control-opt-map+
+     (merge +component-opt-map+
+      {:text [#(.getCaption %1) #(.setCaption %1 %2)]}))
 
 (def +button-opt-map+
      (merge +component-opt-map+
@@ -135,6 +184,8 @@
 (extend-protocol AConfigurableMap
   goog.ui.Component
   (-config-map [c] +component-opt-map+)
+  goog.ui.Control
+  (-config-map [c] +control-opt-map+)
   
   goog.ui.Dialog
   (-config-map [c] +dialog-opt-map+)
@@ -167,12 +218,10 @@
              items-visible?]
       :or {;button-set goog.ui.Dialog.ButtonSet.CONTINUE_SAVE_CANCEL
            items-visible? true
-           }}]
+           }
+      :as argmap}]
   (let [dlg (goog.ui.Dialog.)]
-    (config!-when content dlg :content)
-    (config!-when modal? dlg :modal?)
-    (config!-when title dlg :title)
-    (config!-when button-set dlg :button-set)
+    (generic-configure! dlg argmap)
     ;; (goog.events.listen window "unload" (fn [] (goog.events.removeAll)))
     (when on-select
       (goog.events.listen dlg goog.ui.Dialog.EventType.SELECT on-select))
@@ -184,18 +233,27 @@
 (defn button
   ;; TODO: maybe this should be color-button instead?
   [& {:keys [text tooltip color]
-      :or {text ""}}]
+      :or {text ""}
+      :as argmap}]
   (let [btn (if color
               (goog.ui.ColorButton. text)
               (goog.ui.Button. text))]
-    (config!-when tooltip btn :tooltip)
-    (config!-when color btn :color)
+    (generic-configure! btn argmap) 
     btn))
 
 (defn input
   [& {:keys [text]
-      :or {text ""}}]
+      :or {text ""}
+      :as argmap}]
   (let [lbl (goog.ui.LabelInput. text)]
+    (generic-configure! lbl argmap)
+    lbl))
+
+(defn label
+  [& {:keys [text]
+      :as argmap}]
+  (let [lbl (goog.ui.Control.)]
+    (generic-configure! lbl argmap)
     lbl))
 
 
@@ -210,8 +268,13 @@
 
   (let [dlg (dialog :title "Hello There!"
                     :items
-                    [(button :text "Push me!" :tooltip "Not implemented" :color "green")
-                     (input :text "")])] 
+                    [(button :text "Push me!"
+                             :tooltip "Not implemented"
+                             :color "green"
+                             :listen [:action (fn [e] (debug "Button clicked!"))])
+                     (input :text "")
+                     (doto (label :text)
+                       (.setCaption "test"))])] 
     (.setVisible dlg true))
 
 
@@ -220,5 +283,4 @@
     (.info log "Hallo Welt! Ich war hier!")
     (.render
      (button :text "Database" :tooltip "Database Connection Status" :color "red")
-     (.getElement goog.dom "buttons")
-     )))
+     (.getElement goog.dom "buttons"))))

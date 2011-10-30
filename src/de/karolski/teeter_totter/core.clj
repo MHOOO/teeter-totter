@@ -32,39 +32,39 @@
     [:link {:rel "stylesheet" :href "/static/css/menubutton.css"}]
     [:link {:rel "stylesheet" :href "/static/css/colormenubutton.css"}]
     (with-pretty-print
-     (script
-      ;; (goog.require "goog.net.BrowserChannel")
-      ;; (goog.require "goog.debug.Logger")
-      ;; (goog.require "goog.debug.Console")
-      ;; (goog.require "goog.json")
-      ;; (goog.require "goog.dom")
-      (goog.require "de.karolski.teeter_totter.core")
-      (defn setup-connection []
-        ;; this here works, but it should be moved to teeter_totter.core
-        (let [bc (new goog.net.BrowserChannel 8)
-              handler (new goog.net.BrowserChannel.Handler)
-              log (new goog.debug.Logger.getLogger "Local") 
-              console (new goog.debug.Console)]
-          ;; enable logging into firebug
-          (.setCapturing console true)
-          ;; remove stuff from browserchannel
-          ;; (.addFilter console "goog.net.BrowserChannel")
+      (script
+       ;; (goog.require "goog.net.BrowserChannel")
+       ;; (goog.require "goog.debug.Logger")
+       ;; (goog.require "goog.debug.Console")
+       ;; (goog.require "goog.json")
+       ;; (goog.require "goog.dom")
+       (goog.require "de.karolski.teeter_totter.core")
+       (defn setup-connection []
+         ;; this here works, but it should be moved to teeter_totter.core
+         (let [bc (new goog.net.BrowserChannel 8)
+               handler (new goog.net.BrowserChannel.Handler)
+               log (new goog.debug.Logger.getLogger "Local") 
+               console (new goog.debug.Console)]
+           ;; enable logging into firebug
+           (.setCapturing console true)
+           ;; remove stuff from browserchannel
+           ;; (.addFilter console "goog.net.BrowserChannel")
 
-          (.info log bc)
-          ;; setup events
-          (set! handler.channelOpened (fn [bc] (.info log "Channel Opened")))
-          (set! handler.channelClosed (fn [bc pending-maps undelivered-maps] (.info log "Channel Closed")))
-          (set! handler.channelError (fn [bc error] (.info log (+ "Channel Error:" error))))
+           (.info log bc)
+           ;; setup events
+           (set! handler.channelOpened (fn [bc] (.info log "Channel Opened")))
+           (set! handler.channelClosed (fn [bc pending-maps undelivered-maps] (.info log "Channel Closed")))
+           (set! handler.channelError (fn [bc error] (.info log (+ "Channel Error:" error))))
 
-          ;; handle code by evaluating it and sending the result back to the client
-          (set! handler.channelHandleArray
-                (fn [bc array]
-                  (.info log (+ "Channel Handle Array:" array))
-                  (.sendMap bc {:result (goog.json.serialize (eval array))})))
-          (.info log "test")
-          (.setHandler bc handler)
-          (.connect bc "channel/test" "channel/channel" {})))
-      ))]
+           ;; handle code by evaluating it and sending the result back to the client
+           (set! handler.channelHandleArray
+                 (fn [bc array]
+                   (.info log (+ "Channel Handle Array:" array))
+                   (.sendMap bc {:result (goog.json.serialize (eval array))})))
+           (.info log "test")
+           (.setHandler bc handler)
+           (.connect bc "channel/test" "channel/channel" {})))
+       ))]
    [:body {:onload
            (js ;; (setup-connection)
             ;; invoke function which has been build using clojurescript
