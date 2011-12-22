@@ -107,6 +107,7 @@
   [c argmap]
   (doseq [[k v] argmap]
     (when (k (config-map c))
+      (debug "Setting " k " to " v " on " c)
       (config! c k v))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -155,8 +156,11 @@
 
 
 (def +component-opt-map+
+     ;; TODO: instead of calling (debug), call (error) or (throw)?
      {:listen [(fn [e] (debug "NOT IMPLEMENTED!") nil) #(apply listen %1 %2)]
-      :visible? [#(.getVisible %1) #(.setVisible %1 %2)]})
+      :visible? [#(.getVisible %1) #(.setVisible %1 %2)]
+      :items [(fn [e] (debug "NOT IMPLEMENTED!") nil) #(doseq [item %2]
+                                                         (.addChild %1 item true))]})
 
 (def +control-opt-map+
      (merge +component-opt-map+
@@ -173,7 +177,10 @@
      (merge +component-opt-map+
       {:title [#(.getTitle %1) #(.setTitle %1 %2)]}
       {:modal? [#(.getModal %1) #(.setModal %1 %2)]}
-      {:content [#(.getContent %1) #(.setContent %1 %2)]}))
+      ;; {:content [#(.getContent %1) #(.setContent %1 %2)]}
+      ;; This is more like in seesaw
+      {:content [#(.getChildAt %1 0) #(.addChildAt %1 %2 0 true)]}
+      ))
 
 
 (extend-type goog.ui.Component
@@ -207,15 +214,10 @@
    :modal?  - true or false to set modality
    :button-set  - one of the constants from goog.ui.Dialog.ButtonSet
    :on-select   - fn of one argument (the event). Event will have a key member with the users choice.
-   :color   - string color value. Example: \"red\".
-
-   :items           - components to be inserted as children.
-   :items-visible?  - Whether items should be inserted with their visibility set to true. Default: true."
+   :color   - string color value. Example: \"red\". "
   [& {:keys [content title
              button-set
-             on-select
-             items
-             items-visible?]
+             on-select]
       :or {;button-set goog.ui.Dialog.ButtonSet.CONTINUE_SAVE_CANCEL
            items-visible? true
            }
@@ -224,9 +226,7 @@
     (generic-configure! dlg argmap)
     ;; (goog.events.listen window "unload" (fn [] (goog.events.removeAll)))
     (when on-select
-      (goog.events.listen dlg goog.ui.Dialog.EventType.SELECT on-select))
-    (doseq [item items]
-      (.addChild dlg item items-visible?)) 
+      (goog.events.listen dlg goog.ui.Dialog.EventType.SELECT on-select)) 
     ;; e.key would contain the key
     dlg))
 
@@ -241,7 +241,7 @@
     (generic-configure! btn argmap) 
     btn))
 
-(defn input
+(defn text
   [& {:keys [text]
       :or {text ""}
       :as argmap}]
@@ -256,6 +256,31 @@
     (generic-configure! lbl argmap)
     lbl))
 
+(defn orientation-kw->google-orientation
+  [orientation-kw]
+  (orientation-kw
+   {:horizontal goog.ui.Container.Orientation.HORIZONTAL
+    :vertical goog.ui.Container.Orientation.VERTICAL}))
+
+(defn panel
+  [& {:keys [orientation items] :or {orientation :horizontal} :as argmap}]
+  (let [c (goog.ui.Component.)]
+    (generic-configure! c argmap)
+    ;; update each child to be have inlineStyle
+    (if (and items (= orientation :horizontal))
+      (doseq [item items]
+        (goog.style.setInlineBlock (. item (getElement)))) ;; display: inline-block
+      (doseq [item items]
+        (goog.style.setStyle (. item (getElement)) "display" "block")))
+    c))
+
+(defn horizontal-panel
+  [& args]
+  (apply panel :orientation :horizontal args))
+
+(defn vertical-panel
+  [& args]
+  (apply panel :orientation :vertical args))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -267,14 +292,22 @@
   (setup-connection)
 
   (let [dlg (dialog :title "Hello There!"
-                    :items
-                    [(button :text "Push me!"
-                             :tooltip "Not implemented"
-                             :color "green"
-                             :listen [:action (fn [e] (debug "Button clicked!"))])
-                     (input :text "")
-                     (doto (label :text)
-                       (.setCaption "test"))])] 
+                    :content
+                    (vertical-panel
+                     :items
+                     [(horizontal-panel
+                       :items [(label :text "Name")
+                               (text :text "Joe Smith")])
+                      (horizontal-panel
+                       :items [(label :text "E-Mail")
+                               (text :text "Joe.Smith@template.com")])
+                      (horizontal-panel
+                       :items [(button :text "Push me!"
+                                       :tooltip "Not implemented"
+                                       :color "green"
+                                       :listen [:action (fn [e] (debug "Button clicked!"))])])])
+                    
+                    )] 
     (.setVisible dlg true))
 
 
