@@ -11,8 +11,8 @@
                  [compojure "1.0.0-RC2"]
                  [ring "1.0.1"]
                  [hiccup "0.3.7"]
-                 [org.clojars.kriyative/clojurejs "1.2.11"]
-                 [org.danlarkin/clojure-json "1.2-SNAPSHOT"]
+                 [org.clojars.kriyative/clojurejs "1.2.14"] ;; NOTE: personal modified repo for clojure 1.3
+                 [cheshire "2.0.4"]
                  [aleph "0.2.1-SNAPSHOT"]]
   :exclusions [org.clojure/clojure-contrib]
   :dev-dependencies [[com.stuartsierra/lazytest "2.0.0-SNAPSHOT"]
