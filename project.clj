@@ -1,24 +1,27 @@
-(defproject de.karolski/teeter-totter "1.0.0-SNAPSHOT"
-  :description "FIXME: write description"
-  :dependencies [[org.clojure/clojure "1.3.0"]
+(defproject de.karolski/teeter-totter "1.0.0-SNAPSHOT" 
+  :dependencies [[org.clojure/clojure "1.5.0-alpha2"]
                  [org.clojure.contrib/macro-utils "1.3.0-alpha4"]
                  [org.clojure/tools.logging "0.1.2"]
-                 ;; [org.clojure.contrib/logging "1.3.0-alpha4"]
                  [org.clojure.contrib/seq "1.3.0-alpha4"]
-                 ;; [org.clojure.contrib/java-utils "1.3.0-alpha4"]
-                 [org.clojure/math.combinatorics "0.0.2"] ;; quick fix for lamina, remove this with new lamina (aleph) release
-                 [seesaw "1.0.11-SNAPSHOT"]
-                 [compojure "1.0.0-SNAPSHOT"]
+                 [org.clojure/math.combinatorics "0.0.2"]
+                 [seesaw "1.4.2"]
+                 [compojure "1.0.0"]
                  [ring "1.0.0-RC1"]
                  [hiccup "0.3.7"]
-                 [org.clojars.kriyative/clojurejs "1.2.11"]
-                 [org.danlarkin/clojure-json "1.2-SNAPSHOT"]
-                 [aleph "0.2.1-SNAPSHOT"]
-                 ]
+                 [org.clojars.kriyative/clojurejs "1.2.18"]
+                 [cheshire "4.0.0"]
+                 [aleph "0.3.0-alpha2"]]
+  ;;:hooks [hooks]
+  :checkout-deps-shares [:source-path :test-path
+                         ~(fn [p] (str (:root p) "/clojurescript/lib/*"))]
   :exclusions [org.clojure/clojure-contrib]
-  :dev-dependencies [[com.stuartsierra/lazytest "2.0.0-SNAPSHOT"]
-                     [robert/hooke "1.1.0"]]
-  :hooks [hooks]
-  :repositories {"stuartsierra-releases" "http://stuartsierra.com/maven2"
-                 "stuartsierra-snapshots" "http://stuartsierra.com/m2snapshots"}
-)
+  :profiles {:dev
+             {:dependencies
+              [[com.stuartsierra/lazytest "2.0.0-SNAPSHOT"]
+               [robert/hooke "1.1.0"]]}}
+  :repositories {"stuartsierra-releases"
+                 "http://stuartsierra.com/maven2",
+                 "stuartsierra-snapshots"
+                 "http://stuartsierra.com/m2snapshots"}
+  :min-lein-version "2.0.0"
+  :description "FIXME: write description")

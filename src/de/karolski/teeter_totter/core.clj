@@ -9,7 +9,7 @@
         [cljs.closure :only (build)]
         lamina.core)
   (:require [compojure.route :as route]
-            [org.danlarkin [json :as json]]))
+            [cheshire.custom :as json]))
 
 
 ;; build core.cljs to test out clojurescript
