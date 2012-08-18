@@ -1,24 +1,35 @@
 (ns de.karolski.teeter-totter.core
-  (:use (clojure.tools [logging :only (debug error warn info with-logs)])
+  (:use (clojure.tools [logging :only (debug warn info with-logs)])
         compojure.core
         hiccup.core
         hiccup.page-helpers
         ring.adapter.jetty
         [ring.middleware.params :only [wrap-params]]
         [clojurejs.js :only (js script with-pretty-print)]
-        [cljs.closure :only (build)]
+        ;; [cljs.closure :only (build)]
         lamina.core)
   (:require [compojure.route :as route]
-            [cheshire.custom :as json]))
+            [cheshire.custom :as json]
+            [noir.cljs.core :as ncljs]))
 
+(def cljs-options
+  {:optimizations :simple
+   :pretty-print true
+   :output-to "static/js-out/hello/hello.js"
+   ;; :advanced {:externs ["externs/jquery.js"]}
+   })
+
+(let [mode (keyword (or (first m) :dev))
+      port (Integer. (get (System/getenv) "PORT" "8090"))]
+  (ncljs/start mode cljs-options))
 
 ;; build core.cljs to test out clojurescript
-(build "src/de/karolski/teeter_totter"
-       {;:optimizations :whitespace
-        ;:optimizations :advanced
-        :optimizations :simple
-        :pretty-print true
-        :output-to "static/js-out/hello/hello.js" })
+;; (build "src/de/karolski/teeter_totter"
+;;        {;:optimizations :whitespace
+;;         ;:optimizations :advanced
+;;         :optimizations :simple
+;;         :pretty-print true
+;;         :output-to "static/js-out/hello/hello.js" })
 
 (defn render-main []
   [:html
