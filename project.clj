@@ -11,10 +11,29 @@
                  [org.clojars.kriyative/clojurejs "1.2.18"]
                  [cheshire "4.0.0"]
                  [aleph "0.3.0-alpha2"]
-                 [noir-cljs "0.3.4"
-                  ;; for some reason noir-cljs forces clojure 1.3 instead of 1.5
-                  :exclusions [org.clojure/clojure]]
+                 
+                 ;; [noir-cljs "0.3.4"
+                 ;;  ;; for some reason noir-cljs forces clojure 1.3 instead of 1.5
+                 ;;  :exclusions [org.clojure/clojure]]
                  ]
+
+  :cljsbuild {
+    :builds [{
+        ; The path to the top-level ClojureScript source directory:
+        :source-path "src/cljs"
+        ; The standard ClojureScript compiler options:
+        ; (See the ClojureScript compiler documentation for details.)
+        :compiler {
+                   :output-to "static/js-out/hello/hello.js" 
+                   :optimizations :simple
+                   :pretty-print true}}]}
+
+  :profiles {:dev
+             {:dependencies
+              [[robert/hooke "1.1.0"]]}}
+  
+  :plugins [[lein-cljsbuild "0.2.5"]]
   :exclusions [org.clojure/clojure-contrib]
   :min-lein-version "2.0.0"
-  :description "FIXME: write description")
+  :description "FIXME: write description"
+  :main ^{:skip-aot true} de.karolski.teeter-totter.core)

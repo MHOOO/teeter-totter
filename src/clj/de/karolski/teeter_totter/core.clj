@@ -6,24 +6,10 @@
         ring.adapter.jetty
         [ring.middleware.params :only [wrap-params]]
         [clojurejs.js :only (js script with-pretty-print)]
-        ;; [cljs.closure :only (build)]
         lamina.core)
   (:require [compojure.route :as route]
-            [cheshire.custom :as json]
-            [noir.cljs.core :as ncljs]))
+            [cheshire.custom :as json]))
 
-(def cljs-options
-  {:optimizations :simple
-   :pretty-print true
-   :output-to "static/js-out/hello/hello.js"
-   ;; :advanced {:externs ["externs/jquery.js"]}
-   })
-
-(defn setup-cljs-compilation [& m]
-  (let [mode (keyword (or (first m) :dev))
-        port (Integer. (get (System/getenv) "PORT" "8090"))]
-    (ncljs/start mode cljs-options)))
-(setup-cljs-compilation)
 
 ;; build core.cljs to test out clojurescript
 ;; (build "src/de/karolski/teeter_totter"
@@ -179,24 +165,23 @@ session ids and keys are client maps."} +sessions+ (ref {}))
   [& body]
   `(broadcast-eval* (js ~@body)))
 
-(doall
- (map
-  receive-all
-  (repeat +session-recv-channel+)
-  [ ;; add the session to the session map
-   (fn [session] (dosync (alter +sessions+ (fn [sessions] (assoc sessions (:sid session) session)))))
-   ;; remove any old sessions from the session map
-   (fn [_] (remove-old-sessions))
-   ;; in case the ping thread is not active, activate it
-   (fn [_] (when (not @+ping-thread-active+)
-             (reset! +ping-thread-active+ true)
-             (future
-               (while @+ping-thread-active+
-                 (Thread/sleep 30000)
-                 (remove-old-sessions)
-                 (if (empty? (sessions))
-                   (reset! +ping-thread-active+ false)
-                   (broadcast-eval "noop"))))))]))
+(map
+ receive-all
+ (repeat +session-recv-channel+)
+ [ ;; add the session to the session map
+  (fn [session] (dosync (alter +sessions+ (fn [sessions] (assoc sessions (:sid session) session)))))
+  ;; remove any old sessions from the session map
+  (fn [_] (remove-old-sessions))
+  ;; in case the ping thread is not active, activate it
+  (fn [_] (when (not @+ping-thread-active+)
+            (reset! +ping-thread-active+ true)
+            (future
+              (while @+ping-thread-active+
+                (Thread/sleep 30000)
+                (remove-old-sessions)
+                (if (empty? (sessions))
+                  (reset! +ping-thread-active+ false)
+                  (broadcast-eval "noop"))))))])
 
 (defn update-client
   "Update the client with the specified session id using the function f."
