@@ -7,11 +7,11 @@
                  [seesaw "1.4.2"]
                  [compojure "1.0.0"]
                  [ring "1.0.0-RC1"]
-                 [hiccup "0.3.7"]
+                 [hiccup "1.0.1"]
                  [org.clojars.kriyative/clojurejs "1.2.18"]
                  [cheshire "4.0.0"]
                  [aleph "0.3.0-alpha2"]
-                 [noir-cljs "0.3.0"
+                 [noir-cljs "0.3.4"
                   ;; for some reason noir-cljs forces clojure 1.3 instead of 1.5
                   :exclusions [org.clojure/clojure]]
                  ]
