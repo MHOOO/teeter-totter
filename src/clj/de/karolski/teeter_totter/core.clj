@@ -1,13 +1,15 @@
 (ns de.karolski.teeter-totter.core
   (:use (clojure.tools [logging :only (debug warn info with-logs)])
-        compojure.core
+        compojure.core 
         hiccup.core
         hiccup.page
+        [hiccup.middleware :only (wrap-base-url)]
         ring.adapter.jetty
         [ring.middleware.params :only [wrap-params]]
         [clojurejs.js :only (js script with-pretty-print)]
         lamina.core)
   (:require [compojure.route :as route]
+            [compojure.handler :as handler]
             [cheshire.custom :as json]))
 
 
@@ -24,6 +26,8 @@
    [:head
     [:script {:type "text/javascript" :src "/static/closure-library/closure/goog/base.js"}]
     [:script {:type "text/javascript" :src "/static/js-out/hello/hello.js"}]
+    [:script {:type "text/javascript" :src "/static/linb/runtime/jsLinb/js/linb-all.js"}]
+    [:script {:type "text/javascript" :src "/static/linb/runtime/jsLinb/js/adv-all.js"}]
     ;; TODO: these should be added automatically depending on what is being used
     [:link {:rel "stylesheet" :href "/static/css/common.css"}]
     [:link {:rel "stylesheet" :href "/static/css/dialog.css"}]
@@ -165,23 +169,24 @@ session ids and keys are client maps."} +sessions+ (ref {}))
   [& body]
   `(broadcast-eval* (js ~@body)))
 
-(map
- receive-all
- (repeat +session-recv-channel+)
- [ ;; add the session to the session map
-  (fn [session] (dosync (alter +sessions+ (fn [sessions] (assoc sessions (:sid session) session)))))
-  ;; remove any old sessions from the session map
-  (fn [_] (remove-old-sessions))
-  ;; in case the ping thread is not active, activate it
-  (fn [_] (when (not @+ping-thread-active+)
-            (reset! +ping-thread-active+ true)
-            (future
-              (while @+ping-thread-active+
-                (Thread/sleep 30000)
-                (remove-old-sessions)
-                (if (empty? (sessions))
-                  (reset! +ping-thread-active+ false)
-                  (broadcast-eval "noop"))))))])
+(doall
+ (map
+  receive-all
+  (repeat +session-recv-channel+)
+  [ ;; add the session to the session map
+   (fn [session] (dosync (alter +sessions+ (fn [sessions] (assoc sessions (:sid session) session)))))
+   ;; remove any old sessions from the session map
+   (fn [_] (remove-old-sessions))
+   ;; in case the ping thread is not active, activate it
+   (fn [_] (when (not @+ping-thread-active+)
+             (reset! +ping-thread-active+ true)
+             (future
+               (while @+ping-thread-active+
+                 (Thread/sleep 30000)
+                 (remove-old-sessions)
+                 (if (empty? (sessions))
+                   (reset! +ping-thread-active+ false)
+                   (broadcast-eval "noop"))))))]))
 
 (defn update-client
   "Update the client with the specified session id using the function f."
@@ -273,6 +278,50 @@ session ids and keys are client maps."} +sessions+ (ref {}))
 (defn button [& args]
   (Button. nil))
 
+(defroutes channel-routes
+;;; testing the connection
+  (GET "/test" [& args]
+       (cond
+        (= (args :MODE) "init") (json/encode ["",""])
+        (= (args :TYPE) "xmlhttp")
+
+        ;; we have to send 2 chunks of data with a wait time of 2
+        ;; seconds, so the browser can figure out whether it is
+        ;; behind a buffering proxy or not
+        (xmlhttp-chunk-seq :wait 200))) 
+;;; forward channel
+  (POST "/channel" [& args]
+        (let [client (if (args :SID) (get-client (args :SID)) (get-client))
+              data (reduce merge {} 
+                           (filter (complement nil?)
+                                   (map #(if-let [[_ name] (re-matches #"req\d+_(.*)" (name %1))]
+                                           [name %2])
+                                        (keys args)
+                                        (vals args))))]
+          (when (not= data {})
+            (enqueue (:forward-channel client)
+                     data))
+          (update-client (:sid client) (fn [client] (assoc client :last-active (System/nanoTime))))
+          (if (not (args :SID))
+            ;; return information on newly created session
+            (gen-session-create-response client) 
+          
+            ;; Send client backchannel information
+            (let [client (get-client (args :SID))
+                  data (json/encode [1 ;; 1=backchannel present, 0=no backchannel
+                                     (:last-response-array-id client)
+                                     ;; TODO: This is not yet updated inside the backward channel!
+                                     (:outstanding-backchannel-bytes client)])]
+              (str (count data) "\n" data)))))
+;;; backward channel, this should ideally be a long-lived channel
+  (GET "/channel" [& args]
+       (let [client (get-client (args :SID))]
+         (map #(dosync
+                (let [id (:last-response-array-id client)]
+                  (update-client (:sid client) (fn [client] (update-in client [:last-response-array-id] inc)))
+                  (gen-xhr-response % :start-index id)))
+              (lazy-channel-seq (:backward-channel client))))))
+
 (defroutes main-routes
   (GET "/" [] (html (render-main)))
   ;; (GET "demo/:sid" [sid]
@@ -285,51 +334,23 @@ session ids and keys are client maps."} +sessions+ (ref {}))
   ;;          (config! :title "Login"))))
 
 ;;;;; BrowserChannel API
-;;; testing the connection
-  (GET "/channel/test" [& args]
-       (cond
-        (= (args "MODE") "init") (json/encode ["",""])
-        (= (args "TYPE") "xmlhttp")
-
-        ;; we have to send 2 chunks of data with a wait time of 2
-        ;; seconds, so the browser can figure out whether it is
-        ;; behind a buffering proxy or not
-        (xmlhttp-chunk-seq :wait 200)))
-;;; forward channel
-  (POST "/channel/channel" [& args]
-        (let [client (if (args "SID") (get-client (args "SID")) (get-client))
-              data (reduce merge {} 
-                           (filter (complement nil?)
-                                   (map #(if-let [[_ name] (re-matches #"req\d+_(.*)" %1)]
-                                           [name %2])
-                                        (keys args)
-                                        (vals args))))]
-          (when (not= data {})
-            (enqueue (:forward-channel client)
-                     data))
-          (update-client (:sid client) (fn [client] (assoc client :last-active (System/nanoTime))))
-          (if (not (args "SID"))
-            ;; return information on newly created session
-            (gen-session-create-response client) 
-          
-            ;; Send client backchannel information
-            (let [client (get-client (args "SID"))
-                  data (json/encode [1 ;; 1=backchannel present, 0=no backchannel
-                                     (:last-response-array-id client)
-                                     ;; TODO: This is not yet updated inside the backward channel!
-                                     (:outstanding-backchannel-bytes client)])]
-              (str (count data) "\n" data)))))
-;;; backward channel, this should ideally be a long-lived channel
-  (GET "/channel/channel" [& args]
-       (let [client (get-client (args "SID"))]
-         (map #(dosync
-                (let [id (:last-response-array-id client)]
-                  (update-client (:sid client) (fn [client] (update-in client [:last-response-array-id] inc)))
-                  (gen-xhr-response % :start-index id)))
-              (lazy-channel-seq (:backward-channel client)))))
+  (context "/channel" [] channel-routes)
   (route/files "/static" {:root "./static"})
   (route/not-found "Page not found"))
 
-(def wrapped-main-routes (wrap-params main-routes))
+
+(defn web-error-handler [handler]
+  (fn [request]
+    (try
+      (handler request)
+      (catch Exception e
+        (println e)
+        (throw e)))))
+
+
+;; (def wrapped-main-routes (wrap-params main-routes))
+(def wrapped-main-routes (-> (handler/site main-routes)
+                             (wrap-base-url)
+                             (web-error-handler)))
 
 (defonce jetty* (future (run-jetty (var wrapped-main-routes) {:port 8080})))
