@@ -8,93 +8,37 @@
         [ring.middleware.params :only [wrap-params]]
         [clojurejs.js :only (js script with-pretty-print)]
         lamina.core
-        (clojure [stacktrace :only (print-stack-trace)]))
+        (clojure [stacktrace :only (print-stack-trace)])
+        [watchtower.core :only (watcher file-filter extensions on-change rate)])
   (:require [compojure.route :as route]
             [compojure.handler :as handler]
             [cheshire.custom :as json]))
-
-
-;; build core.cljs to test out clojurescript
-;; (build "src/de/karolski/teeter_totter"
-;;        {;:optimizations :whitespace
-;;         ;:optimizations :advanced
-;;         :optimizations :simple
-;;         :pretty-print true
-;;         :output-to "static/js-out/hello/hello.js" })
 
 (defn render-main []
   [:html
    [:head
     [:script {:type "text/javascript" :src "/static/closure-library/closure/goog/base.js"}]
+
+    ;; teeter-totter library (TODO: rename)
     [:script {:type "text/javascript" :src "/static/js-out/hello/hello.js"}]
+
+    ;; jslinb files
     [:script {:type "text/javascript" :src "/static/linb/runtime/jsLinb/js/linb-all.js"}]
     [:script {:type "text/javascript" :src "/static/linb/runtime/jsLinb/js/adv-all.js"}]
-    ;; TODO: these should be added automatically depending on what is being used
+
+    ;; google closure css files (TODO: these should be added automatically
+    ;; depending on what is being used)
     [:link {:rel "stylesheet" :href "/static/css/common.css"}]
     [:link {:rel "stylesheet" :href "/static/css/dialog.css"}]
     [:link {:rel "stylesheet" :href "/static/css/button.css"}]
     [:link {:rel "stylesheet" :href "/static/css/menubutton.css"}]
-    [:link {:rel "stylesheet" :href "/static/css/colormenubutton.css"}]
-    ;; (with-pretty-print
-    ;;   (script
-    ;;    ;; (goog.require "goog.net.BrowserChannel")
-    ;;    ;; (goog.require "goog.debug.Logger")
-    ;;    ;; (goog.require "goog.debug.Console")
-    ;;    ;; (goog.require "goog.json")
-    ;;    ;; (goog.require "goog.dom")
-    ;;    (goog.require "de.karolski.teeter_totter.core")
-    ;;    (defn setup-connection []
-    ;;      ;; this here works, but it should be moved to teeter_totter.core
-    ;;      (let [bc (new goog.net.BrowserChannel 8)
-    ;;            handler (new goog.net.BrowserChannel.Handler)
-    ;;            log (new goog.debug.Logger.getLogger "Local") 
-    ;;            console (new goog.debug.Console)]
-    ;;        ;; enable logging into firebug
-    ;;        (.setCapturing console true)
-    ;;        ;; remove stuff from browserchannel
-    ;;        ;; (.addFilter console "goog.net.BrowserChannel")
-
-    ;;        (.info log bc)
-    ;;        ;; setup events
-    ;;        (set! handler.channelOpened (fn [bc] (.info log "Channel Opened")))
-    ;;        (set! handler.channelClosed (fn [bc pending-maps undelivered-maps] (.info log "Channel Closed")))
-    ;;        (set! handler.channelError (fn [bc error] (.info log (+ "Channel Error:" error))))
-
-    ;;        ;; handle code by evaluating it and sending the result back to the client
-    ;;        (set! handler.channelHandleArray
-    ;;              (fn [bc array]
-    ;;                (.info log (+ "Channel Handle Array:" array))
-    ;;                (.sendMap bc {:result (goog.json.serialize (eval array))})))
-    ;;        (.info log "test")
-    ;;        (.setHandler bc handler)
-    ;;        (.connect bc "channel/test" "channel/channel" {})))
-    ;;    ))
-    ]
+    [:link {:rel "stylesheet" :href "/static/css/colormenubutton.css"}]]
    [:body {:onload
-           (js ;; (setup-connection)
-            ;; invoke function which has been build using clojurescript
+           ;; setup teeter-totter
+           (js
             (goog.require "de.karolski.teeter_totter.core")
             (de.karolski.teeter-totter.core.main))}
     [:div#logdiv]]])
-
-;; (defn xmlhttp-chunk-seq [& {:keys [wait] :or {wait 2000}}]
-;;   (let [c (ref "111112")]
-;;     (proxy [java.io.InputStream] []
-;;       (available [] (count @c))
-;;       (read ([]
-;;                (when (== (count @c) 1)
-;;                  (Thread/sleep wait))
-;;                (dosync
-;;                 (let [ret (first @c)]
-;;                   (alter c rest)
-;;                   (int ret))))
-;;             ([b-arr]
-;;                (let [m (min (count b-arr) (.available this))]
-;;                  (println "Reading out" m "bytes")
-;;                  (dotimes [x m]
-;;                    (let [b (.read this)]
-;;                      (aset b-arr x (byte b))))
-;;                  m))))))
 
 (defn xmlhttp-chunk-seq [& {:keys [wait] :or {wait 2000}}]
   (lazy-seq
@@ -157,7 +101,7 @@ session ids and keys are client maps."} +sessions+ (ref {}))
 ;; the global channel. Anything sent to it will go to any client
 (def +broadcast-channel+
   (doto (permanent-channel)
-    (receive-all #(println "Message put into +broadcast-channel+: " %))))
+    (receive-all #(debug "Message put into +broadcast-channel+: " %))))
 
 (defn broadcast-eval*
   "Evaluate the javascript code given as a string on *all* connected clients
@@ -254,8 +198,11 @@ session ids and keys are client maps."} +sessions+ (ref {}))
   "Like EVAL-ON-CLIENT*, but also return the evaluated value."
   [client js-str & {:keys [timeout] :or {timeout 3000}}]
   (eval-on-client* client js-str)
-  (json/decode
-   (get (wait-for-message (:forward-channel client) timeout) "result" nil)))
+  (let [r (wait-for-message (:forward-channel client) timeout)]
+    (json/decode
+     (if-let [error (get r "error")]
+       (throw (Exception. error))
+       (get r "result")))))
 
 (defmacro reval-on-client
   "Like EVAL-ON-CLIENT, but for REVAL-ON-CLIENT*."
@@ -303,7 +250,7 @@ session ids and keys are client maps."} +sessions+ (ref {}))
         (xmlhttp-chunk-seq :wait 2000))) 
 ;;; forward channel
   (POST "/channel" [& args]
-        (println "browser->server:" args)
+        (debug "browser->server:" args)
         (let [client (if (args :SID) (get-client (args :SID)) (get-client))
               data (reduce merge {} 
                            (filter (complement nil?)
@@ -312,14 +259,14 @@ session ids and keys are client maps."} +sessions+ (ref {}))
                                         (keys args)
                                         (vals args))))]
           (when (not= data {})
-            (println "enqueing into forward-channel:" data)
+            (debug "enqueing into forward-channel:" data)
             (enqueue (:forward-channel client)
                      data))
           (update-client (:sid client) (fn [client] (assoc client :last-active (System/nanoTime))))
           (if (not (args :SID))
             ;; return information on newly created session
             (let [r (gen-session-create-response client)]
-              (println "Sending initial setup data:" r)
+              (debug "Sending initial setup data:" r)
               r) 
           
             ;; Send client backchannel information
@@ -332,7 +279,7 @@ session ids and keys are client maps."} +sessions+ (ref {}))
 ;;; backward channel, this should ideally be a long-lived channel
   (GET "/channel" [& args]
        (let [client (get-client (args :SID))]
-         (println "Client" (:sid client) "asked for channel data")
+         (debug "Client" (:sid client) "asked for channel data")
          (map #(dosync
                 (let [id (:last-response-array-id client)]
                   (update-client (:sid client) (fn [client] (update-in client [:last-response-array-id] inc)))
@@ -371,3 +318,17 @@ session ids and keys are client maps."} +sessions+ (ref {}))
                              (web-error-handler)))
 
 (defonce jetty* (future (run-jetty (var wrapped-main-routes) {:port 8080})))
+
+
+;; send message to all client when js file changed
+(defonce file-watcher
+  (watcher ["static/js-out/hello/"]
+           (rate 150)
+           (file-filter (extensions :js))
+           (on-change
+            (fn [_]
+              (debug "broadcasting updates")
+              (broadcast-eval
+               (do
+                 (linb.message "Reloading js file")
+                 (goog.require "de.karolski.teeter-totter.core")))))))

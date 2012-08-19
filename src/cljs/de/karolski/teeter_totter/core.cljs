@@ -18,20 +18,20 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; HELPER FNs
 
-(defn jsArr
+(defn ^:export jsArr
   "Recursively converts a sequential object into a JavaScript array"
   [seq]
   (.array (vec (map #(if (sequential? %) (jsArr %) %)
                     seq))))
 
 
-(defn jsObj
+(defn ^:export jsObj
   "Convert a clojure map into a JavaScript object"
   [obj]
   (apply js-obj (apply concat obj)))
 
 (let [log (glogger/getLogger "DEBUG")]
- (defn debug [& args]
+ (defn ^:export debug [& args]
    (.info log (reduce str "" args))))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -45,6 +45,8 @@
 
     (when debug?
       (.setCapturing console true))))
+
+;; (defn channel-data-handler )
 
 (defn ^:export setup-connection
   "Establish a permanent connection with the server which allows the
@@ -63,13 +65,30 @@
     ;; handle code by evaluating it and sending the result back to the client
     (set! (.-channelHandleArray handler)
           (fn [bc array]
-            (.info log (+ "Channel Handle Array:" array))
-            (.sendMap bc (jsObj {"result" (gjson/serialize (js/eval array))}))))
+            (let [log (glogger/getLogger "Local")]
+              (.info log (+ "Channel Handle Array:" array))
+              (let [[result error]
+                    (try
+                      [(js/eval array) nil]
+                      (catch js/Error e
+                        (.info log (+ "EVAL ERROR: " e))
+                        [nil e]))
+                    data (if error
+                           {"error" error}
+                           {"result" (gjson/serialize result)})
+                    ]
+                (.sendMap
+                 bc
+                 (jsObj data))))))
     (.info log "Connecting to server through BrowserChannel")
     (.setHandler bc handler)
     (.connect bc "channel/test" "channel/channel" (jsObj {}))))
 
 
+(defn ^:export test-exceptions []
+  (try (dummy231)
+       (catch js/Error e
+         nil)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -81,22 +100,22 @@
 (defprotocol AConfigurableMap
   (-config-map [c] "return the configuration map"))
 
-(defn config [c key]
+(defn ^:export config [c key]
   (-config c key))
 
-(defn config! [c key val]
+(defn ^:export config! [c key val]
   (-config! c key val))
 
-(defn config-map [c] 
+(defn ^:export config-map [c] 
   (-config-map c))
 
-(defn config!-when
+(defn ^:export config!-when
   ;; TODO: this should be a macro
   [val c key]
   (when val
     (config! c key val)))
 
-(defn generic-configure!
+(defn ^:export generic-configure!
   [c argmap]
   (doseq [[k v] argmap]
     (when (k (config-map c))
@@ -194,7 +213,7 @@
 
 
 
-(defn dialog
+(defn ^:export dialog
   "Make dialog visible using (.setVisible).
  Use
    (.addChild dlg child true) to add components to the dialog & render
@@ -223,7 +242,7 @@
     ;; e.key would contain the key
     dlg))
 
-(defn button
+(defn ^:export button
   ;; TODO: maybe this should be color-button instead?
   [& {:keys [text tooltip color]
       :or {text ""}
@@ -234,7 +253,7 @@
     (generic-configure! btn argmap) 
     btn))
 
-(defn text
+(defn ^:export text
   [& {:keys [text]
       :or {text ""}
       :as argmap}]
@@ -242,7 +261,7 @@
     (generic-configure! lbl argmap)
     lbl))
 
-(defn label
+(defn ^:export label
   [& {:keys [text]
       :as argmap}]
   (let [lbl (goog.ui.Control.)]
@@ -255,7 +274,7 @@
    {:horizontal goog.ui.Container.Orientation.HORIZONTAL
     :vertical goog.ui.Container.Orientation.VERTICAL}))
 
-(defn panel
+(defn ^:export panel
   [& {:keys [orientation items] :or {orientation :horizontal} :as argmap}]
   (let [c (goog.ui.Component.)]
     (generic-configure! c argmap)
@@ -267,11 +286,11 @@
         (goog.style.setStyle (. item (getElement)) "display" "block")))
     c))
 
-(defn horizontal-panel
+(defn ^:export horizontal-panel
   [& args]
   (apply panel :orientation :horizontal args))
 
-(defn vertical-panel
+(defn ^:export vertical-panel
   [& args]
   (apply panel :orientation :vertical args))
 

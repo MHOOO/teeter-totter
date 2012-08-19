@@ -30,7 +30,8 @@
 
   :profiles {:dev
              {:dependencies
-              [[robert/hooke "1.1.0"]]}}
+              [[robert/hooke "1.1.0"]
+               [watchtower "0.1.1" :exclusions [org.clojure/clojure]]]}}
   
   :plugins [[lein-cljsbuild "0.2.5"]]
   :exclusions [org.clojure/clojure-contrib]

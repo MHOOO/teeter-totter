@@ -22003,13 +22003,15 @@ de.karolski.teeter_totter.core.jsArr = function jsArr(b) {
     return cljs.core.sequential_QMARK_.call(null, b) ? jsArr.call(null, b) : b
   }, b)).array()
 };
+goog.exportSymbol("de.karolski.teeter_totter.core.jsArr", de.karolski.teeter_totter.core.jsArr);
 de.karolski.teeter_totter.core.jsObj = function(a) {
   return cljs.core.apply.call(null, cljs.core.js_obj, cljs.core.apply.call(null, cljs.core.concat, a))
 };
-var log__171151 = goog.debug.Logger.getLogger("DEBUG");
+goog.exportSymbol("de.karolski.teeter_totter.core.jsObj", de.karolski.teeter_totter.core.jsObj);
+var log__188649 = goog.debug.Logger.getLogger("DEBUG");
 de.karolski.teeter_totter.core.debug = function() {
   var a = function(a) {
-    return log__171151.info(cljs.core.reduce.call(null, cljs.core.str, "", a))
+    return log__188649.info(cljs.core.reduce.call(null, cljs.core.str, "", a))
   }, b = function(b) {
     var d = null;
     goog.isDef(b) && (d = cljs.core.array_seq(Array.prototype.slice.call(arguments, 0), 0));
@@ -22023,6 +22025,7 @@ de.karolski.teeter_totter.core.debug = function() {
   b.cljs$lang$arity$variadic = a;
   return b
 }();
+goog.exportSymbol("de.karolski.teeter_totter.core.debug", de.karolski.teeter_totter.core.debug);
 de.karolski.teeter_totter.core.setup_environment = function() {
   var a = function(a) {
     var a = cljs.core.seq_QMARK_.call(null, a) ? cljs.core.apply.call(null, cljs.core.hash_map, a) : a, a = cljs.core._lookup.call(null, a, "\ufdd0'debug?", null), b = new goog.debug.Console;
@@ -22053,15 +22056,37 @@ de.karolski.teeter_totter.core.setup_connection = function() {
   c.channelError = function(b, c) {
     return a.info("Channel Error:" + c)
   };
-  c.channelHandleArray = function(b, c) {
-    a.info("Channel Handle Array:" + c);
-    return b.sendMap(de.karolski.teeter_totter.core.jsObj.call(null, cljs.core.ObjMap.fromObject(["result"], {result:goog.json.serialize(eval(c))})))
+  c.channelHandleArray = function(a, b) {
+    var c = goog.debug.Logger.getLogger("Local");
+    c.info("Channel Handle Array:" + b);
+    var g = function() {
+      try {
+        return cljs.core.PersistentVector.fromArray([eval(b), null], !0)
+      }catch(a) {
+        if(cljs.core.instance_QMARK_.call(null, Error, a)) {
+          return c.info("EVAL ERROR: " + a), cljs.core.PersistentVector.fromArray([null, a], !0)
+        }
+        throw a;
+      }
+    }(), h = cljs.core.nth.call(null, g, 0, null), g = cljs.core.nth.call(null, g, 1, null), h = cljs.core.truth_(g) ? cljs.core.ObjMap.fromObject(["error"], {error:g}) : cljs.core.ObjMap.fromObject(["result"], {result:goog.json.serialize(h)});
+    return a.sendMap(de.karolski.teeter_totter.core.jsObj.call(null, h))
   };
   a.info("Connecting to server through BrowserChannel");
   b.setHandler(c);
   return b.connect("channel/test", "channel/channel", de.karolski.teeter_totter.core.jsObj.call(null, cljs.core.ObjMap.EMPTY))
 };
 goog.exportSymbol("de.karolski.teeter_totter.core.setup_connection", de.karolski.teeter_totter.core.setup_connection);
+de.karolski.teeter_totter.core.test_exceptions = function() {
+  try {
+    return de.karolski.teeter_totter.core.dummy231.call(null)
+  }catch(a) {
+    if(cljs.core.instance_QMARK_.call(null, Error, a)) {
+      return null
+    }
+    throw a;
+  }
+};
+goog.exportSymbol("de.karolski.teeter_totter.core.test_exceptions", de.karolski.teeter_totter.core.test_exceptions);
 de.karolski.teeter_totter.core.AConfigurable = {};
 de.karolski.teeter_totter.core._config = function(a, b) {
   if(a ? a.de$karolski$teeter_totter$core$AConfigurable$_config$arity$2 : a) {
@@ -22100,15 +22125,19 @@ de.karolski.teeter_totter.core._config_map = function(a) {
 de.karolski.teeter_totter.core.config = function(a, b) {
   return de.karolski.teeter_totter.core._config.call(null, a, b)
 };
+goog.exportSymbol("de.karolski.teeter_totter.core.config", de.karolski.teeter_totter.core.config);
 de.karolski.teeter_totter.core.config_BANG_ = function(a, b, c) {
   return de.karolski.teeter_totter.core._config_BANG_.call(null, a, b, c)
 };
+goog.exportSymbol("de.karolski.teeter_totter.core.config_BANG_", de.karolski.teeter_totter.core.config_BANG_);
 de.karolski.teeter_totter.core.config_map = function(a) {
   return de.karolski.teeter_totter.core._config_map.call(null, a)
 };
+goog.exportSymbol("de.karolski.teeter_totter.core.config_map", de.karolski.teeter_totter.core.config_map);
 de.karolski.teeter_totter.core.config_BANG__when = function(a, b, c) {
   return cljs.core.truth_(a) ? de.karolski.teeter_totter.core.config_BANG_.call(null, b, c, a) : null
 };
+goog.exportSymbol("de.karolski.teeter_totter.core.config_BANG__when", de.karolski.teeter_totter.core.config_BANG__when);
 de.karolski.teeter_totter.core.generic_configure_BANG_ = function(a, b) {
   var c = cljs.core.seq.call(null, b);
   if(c) {
@@ -22127,6 +22156,7 @@ de.karolski.teeter_totter.core.generic_configure_BANG_ = function(a, b) {
     return null
   }
 };
+goog.exportSymbol("de.karolski.teeter_totter.core.generic_configure_BANG_", de.karolski.teeter_totter.core.generic_configure_BANG_);
 de.karolski.teeter_totter.core.event_kw__GT_google_event = function(a) {
   return a.call(null, cljs.core.ObjMap.fromObject("\ufdd0'hide \ufdd0'close \ufdd0'action \ufdd0'before-show \ufdd0'leave \ufdd0'highlight \ufdd0'uncheck \ufdd0'check \ufdd0'blur \ufdd0'change \ufdd0'enter \ufdd0'focus \ufdd0'enable \ufdd0'disable \ufdd0'unselect \ufdd0'unhighlight \ufdd0'open \ufdd0'deactivate \ufdd0'select \ufdd0'show \ufdd0'activate".split(" "), {"\ufdd0'hide":goog.ui.Component.EventType.HIDE, "\ufdd0'close":goog.ui.Component.EventType.CLOSE, "\ufdd0'action":goog.ui.Component.EventType.ACTION, 
   "\ufdd0'before-show":goog.ui.Component.EventType.BEFORE_SHOW, "\ufdd0'leave":goog.ui.Component.EventType.LEAVE, "\ufdd0'highlight":goog.ui.Component.EventType.HIGHLIGHT, "\ufdd0'uncheck":goog.ui.Component.EventType.UNCHECK, "\ufdd0'check":goog.ui.Component.EventType.CHECK, "\ufdd0'blur":goog.ui.Component.EventType.BLUR, "\ufdd0'change":goog.ui.Component.EventType.CHANGE, "\ufdd0'enter":goog.ui.Component.EventType.ENTER, "\ufdd0'focus":goog.ui.Component.EventType.FOCUS, "\ufdd0'enable":goog.ui.Component.EventType.ENABLE, 
@@ -22294,6 +22324,7 @@ de.karolski.teeter_totter.core.dialog = function() {
   b.cljs$lang$arity$variadic = a;
   return b
 }();
+goog.exportSymbol("de.karolski.teeter_totter.core.dialog", de.karolski.teeter_totter.core.dialog);
 de.karolski.teeter_totter.core.button = function() {
   var a = function(a) {
     var a = cljs.core.seq_QMARK_.call(null, a) ? cljs.core.apply.call(null, cljs.core.hash_map, a) : a, b = cljs.core._lookup.call(null, a, "\ufdd0'color", null);
@@ -22314,6 +22345,7 @@ de.karolski.teeter_totter.core.button = function() {
   b.cljs$lang$arity$variadic = a;
   return b
 }();
+goog.exportSymbol("de.karolski.teeter_totter.core.button", de.karolski.teeter_totter.core.button);
 de.karolski.teeter_totter.core.text = function() {
   var a = function(a) {
     var a = cljs.core.seq_QMARK_.call(null, a) ? cljs.core.apply.call(null, cljs.core.hash_map, a) : a, b = cljs.core._lookup.call(null, a, "\ufdd0'text", ""), b = new goog.ui.LabelInput(b);
@@ -22332,6 +22364,7 @@ de.karolski.teeter_totter.core.text = function() {
   b.cljs$lang$arity$variadic = a;
   return b
 }();
+goog.exportSymbol("de.karolski.teeter_totter.core.text", de.karolski.teeter_totter.core.text);
 de.karolski.teeter_totter.core.label = function() {
   var a = function(a) {
     a = cljs.core.seq_QMARK_.call(null, a) ? cljs.core.apply.call(null, cljs.core.hash_map, a) : a;
@@ -22352,6 +22385,7 @@ de.karolski.teeter_totter.core.label = function() {
   b.cljs$lang$arity$variadic = a;
   return b
 }();
+goog.exportSymbol("de.karolski.teeter_totter.core.label", de.karolski.teeter_totter.core.label);
 de.karolski.teeter_totter.core.orientation_kw__GT_google_orientation = function(a) {
   return a.call(null, cljs.core.ObjMap.fromObject(["\ufdd0'horizontal", "\ufdd0'vertical"], {"\ufdd0'horizontal":goog.ui.Container.Orientation.HORIZONTAL, "\ufdd0'vertical":goog.ui.Container.Orientation.VERTICAL}))
 };
@@ -22394,6 +22428,7 @@ de.karolski.teeter_totter.core.panel = function() {
   b.cljs$lang$arity$variadic = a;
   return b
 }();
+goog.exportSymbol("de.karolski.teeter_totter.core.panel", de.karolski.teeter_totter.core.panel);
 de.karolski.teeter_totter.core.horizontal_panel = function() {
   var a = function(a) {
     return cljs.core.apply.call(null, de.karolski.teeter_totter.core.panel, "\ufdd0'orientation", "\ufdd0'horizontal", a)
@@ -22410,6 +22445,7 @@ de.karolski.teeter_totter.core.horizontal_panel = function() {
   b.cljs$lang$arity$variadic = a;
   return b
 }();
+goog.exportSymbol("de.karolski.teeter_totter.core.horizontal_panel", de.karolski.teeter_totter.core.horizontal_panel);
 de.karolski.teeter_totter.core.vertical_panel = function() {
   var a = function(a) {
     return cljs.core.apply.call(null, de.karolski.teeter_totter.core.panel, "\ufdd0'orientation", "\ufdd0'vertical", a)
@@ -22426,6 +22462,7 @@ de.karolski.teeter_totter.core.vertical_panel = function() {
   b.cljs$lang$arity$variadic = a;
   return b
 }();
+goog.exportSymbol("de.karolski.teeter_totter.core.vertical_panel", de.karolski.teeter_totter.core.vertical_panel);
 de.karolski.teeter_totter.core.main = function() {
   de.karolski.teeter_totter.core.setup_environment.call(null, "\ufdd0'debug?", !0);
   de.karolski.teeter_totter.core.setup_connection.call(null);
