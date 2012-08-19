@@ -7,7 +7,8 @@
         ring.adapter.jetty
         [ring.middleware.params :only [wrap-params]]
         [clojurejs.js :only (js script with-pretty-print)]
-        lamina.core)
+        lamina.core
+        (clojure [stacktrace :only (print-stack-trace)]))
   (:require [compojure.route :as route]
             [compojure.handler :as handler]
             [cheshire.custom :as json]))
@@ -34,40 +35,41 @@
     [:link {:rel "stylesheet" :href "/static/css/button.css"}]
     [:link {:rel "stylesheet" :href "/static/css/menubutton.css"}]
     [:link {:rel "stylesheet" :href "/static/css/colormenubutton.css"}]
-    (with-pretty-print
-      (script
-       ;; (goog.require "goog.net.BrowserChannel")
-       ;; (goog.require "goog.debug.Logger")
-       ;; (goog.require "goog.debug.Console")
-       ;; (goog.require "goog.json")
-       ;; (goog.require "goog.dom")
-       (goog.require "de.karolski.teeter_totter.core")
-       (defn setup-connection []
-         ;; this here works, but it should be moved to teeter_totter.core
-         (let [bc (new goog.net.BrowserChannel 8)
-               handler (new goog.net.BrowserChannel.Handler)
-               log (new goog.debug.Logger.getLogger "Local") 
-               console (new goog.debug.Console)]
-           ;; enable logging into firebug
-           (.setCapturing console true)
-           ;; remove stuff from browserchannel
-           ;; (.addFilter console "goog.net.BrowserChannel")
+    ;; (with-pretty-print
+    ;;   (script
+    ;;    ;; (goog.require "goog.net.BrowserChannel")
+    ;;    ;; (goog.require "goog.debug.Logger")
+    ;;    ;; (goog.require "goog.debug.Console")
+    ;;    ;; (goog.require "goog.json")
+    ;;    ;; (goog.require "goog.dom")
+    ;;    (goog.require "de.karolski.teeter_totter.core")
+    ;;    (defn setup-connection []
+    ;;      ;; this here works, but it should be moved to teeter_totter.core
+    ;;      (let [bc (new goog.net.BrowserChannel 8)
+    ;;            handler (new goog.net.BrowserChannel.Handler)
+    ;;            log (new goog.debug.Logger.getLogger "Local") 
+    ;;            console (new goog.debug.Console)]
+    ;;        ;; enable logging into firebug
+    ;;        (.setCapturing console true)
+    ;;        ;; remove stuff from browserchannel
+    ;;        ;; (.addFilter console "goog.net.BrowserChannel")
 
-           (.info log bc)
-           ;; setup events
-           (set! handler.channelOpened (fn [bc] (.info log "Channel Opened")))
-           (set! handler.channelClosed (fn [bc pending-maps undelivered-maps] (.info log "Channel Closed")))
-           (set! handler.channelError (fn [bc error] (.info log (+ "Channel Error:" error))))
+    ;;        (.info log bc)
+    ;;        ;; setup events
+    ;;        (set! handler.channelOpened (fn [bc] (.info log "Channel Opened")))
+    ;;        (set! handler.channelClosed (fn [bc pending-maps undelivered-maps] (.info log "Channel Closed")))
+    ;;        (set! handler.channelError (fn [bc error] (.info log (+ "Channel Error:" error))))
 
-           ;; handle code by evaluating it and sending the result back to the client
-           (set! handler.channelHandleArray
-                 (fn [bc array]
-                   (.info log (+ "Channel Handle Array:" array))
-                   (.sendMap bc {:result (goog.json.serialize (eval array))})))
-           (.info log "test")
-           (.setHandler bc handler)
-           (.connect bc "channel/test" "channel/channel" {})))
-       ))]
+    ;;        ;; handle code by evaluating it and sending the result back to the client
+    ;;        (set! handler.channelHandleArray
+    ;;              (fn [bc array]
+    ;;                (.info log (+ "Channel Handle Array:" array))
+    ;;                (.sendMap bc {:result (goog.json.serialize (eval array))})))
+    ;;        (.info log "test")
+    ;;        (.setHandler bc handler)
+    ;;        (.connect bc "channel/test" "channel/channel" {})))
+    ;;    ))
+    ]
    [:body {:onload
            (js ;; (setup-connection)
             ;; invoke function which has been build using clojurescript
@@ -153,7 +155,9 @@ session ids and keys are client maps."} +sessions+ (ref {}))
                      keys))))))
 
 ;; the global channel. Anything sent to it will go to any client
-(def +broadcast-channel+ (permanent-channel))
+(def +broadcast-channel+
+  (doto (permanent-channel)
+    (receive-all #(println "Message put into +broadcast-channel+: " %))))
 
 (defn broadcast-eval*
   "Evaluate the javascript code given as a string on *all* connected clients
@@ -207,9 +211,16 @@ session ids and keys are client maps."} +sessions+ (ref {}))
      :host-prefix host-prefix
      :last-response-array-id 0
      :forward-channel fc ;; the channel from client -> server
-     :backward-channel (doto (channel)
-                         (->> #_ch
-                              (siphon +broadcast-channel+))) ;; the channel from server -> client
+     :backward-channel (let [backward-channel (channel)]
+                         ;; also enqueue messages into the broadcast channel
+                         (siphon +broadcast-channel+ backward-channel)
+                         ;; make sure to purge messages out of the
+                         ;; backward-channel. We use a
+                         ;; lazy-channel-seq on a forked
+                         ;; backward-channel, which would result in
+                         ;; messages not being removed unless we purge them
+                         (receive-all backward-channel identity)
+                         backward-channel) ;; the channel from server -> client
      :outstanding-backchannel-bytes 0}))
 
 (defn get-client
@@ -231,7 +242,8 @@ session ids and keys are client maps."} +sessions+ (ref {}))
   browser."
   [client js-str]
   (enqueue (:backward-channel client) [js-str])
-  (receive (:forward-channel client) identity))
+  ;; (receive (:forward-channel client) identity)
+  )
 
 (defmacro eval-on-client
   "Like EVAL-ON-CLIENT, but wraps BODY inside a (js ...) form."
@@ -243,7 +255,7 @@ session ids and keys are client maps."} +sessions+ (ref {}))
   [client js-str & {:keys [timeout] :or {timeout 3000}}]
   (eval-on-client* client js-str)
   (json/decode
-   (get (wait-for-message (:forward-channel client) timeout) "result")))
+   (get (wait-for-message (:forward-channel client) timeout) "result" nil)))
 
 (defmacro reval-on-client
   "Like EVAL-ON-CLIENT, but for REVAL-ON-CLIENT*."
@@ -282,15 +294,16 @@ session ids and keys are client maps."} +sessions+ (ref {}))
 ;;; testing the connection
   (GET "/test" [& args]
        (cond
-        (= (args :MODE) "init") (json/encode ["",""])
+        (= (args :MODE) "init") (json/encode [nil nil])
         (= (args :TYPE) "xmlhttp")
 
         ;; we have to send 2 chunks of data with a wait time of 2
         ;; seconds, so the browser can figure out whether it is
         ;; behind a buffering proxy or not
-        (xmlhttp-chunk-seq :wait 200))) 
+        (xmlhttp-chunk-seq :wait 2000))) 
 ;;; forward channel
   (POST "/channel" [& args]
+        (println "browser->server:" args)
         (let [client (if (args :SID) (get-client (args :SID)) (get-client))
               data (reduce merge {} 
                            (filter (complement nil?)
@@ -299,12 +312,15 @@ session ids and keys are client maps."} +sessions+ (ref {}))
                                         (keys args)
                                         (vals args))))]
           (when (not= data {})
+            (println "enqueing into forward-channel:" data)
             (enqueue (:forward-channel client)
                      data))
           (update-client (:sid client) (fn [client] (assoc client :last-active (System/nanoTime))))
           (if (not (args :SID))
             ;; return information on newly created session
-            (gen-session-create-response client) 
+            (let [r (gen-session-create-response client)]
+              (println "Sending initial setup data:" r)
+              r) 
           
             ;; Send client backchannel information
             (let [client (get-client (args :SID))
@@ -316,11 +332,12 @@ session ids and keys are client maps."} +sessions+ (ref {}))
 ;;; backward channel, this should ideally be a long-lived channel
   (GET "/channel" [& args]
        (let [client (get-client (args :SID))]
+         (println "Client" (:sid client) "asked for channel data")
          (map #(dosync
                 (let [id (:last-response-array-id client)]
                   (update-client (:sid client) (fn [client] (update-in client [:last-response-array-id] inc)))
                   (gen-xhr-response % :start-index id)))
-              (lazy-channel-seq (:backward-channel client))))))
+              (lazy-channel-seq (fork (:backward-channel client)))))))
 
 (defroutes main-routes
   (GET "/" [] (html (render-main)))
@@ -344,7 +361,7 @@ session ids and keys are client maps."} +sessions+ (ref {}))
     (try
       (handler request)
       (catch Exception e
-        (println e)
+        (print-stack-trace e)
         (throw e)))))
 
 

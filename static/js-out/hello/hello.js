@@ -22003,16 +22003,13 @@ de.karolski.teeter_totter.core.jsArr = function jsArr(b) {
     return cljs.core.sequential_QMARK_.call(null, b) ? jsArr.call(null, b) : b
   }, b)).array()
 };
-de.karolski.teeter_totter.core.jsObj = function jsObj(b) {
-  return cljs.core.into.call(null, cljs.core.ObjMap.EMPTY, cljs.core.map.call(null, function(b) {
-    var d = cljs.core.nth.call(null, b, 0, null), b = cljs.core.nth.call(null, b, 1, null), d = cljs.core.keyword_QMARK_.call(null, d) ? cljs.core.name.call(null, d) : d, b = cljs.core.keyword_QMARK_.call(null, b) ? cljs.core.name.call(null, b) : b;
-    return cljs.core.map_QMARK_.call(null, b) ? cljs.core.PersistentVector.fromArray([d, jsObj.call(null, b)], !0) : cljs.core.PersistentVector.fromArray([d, b], !0)
-  }, b))
+de.karolski.teeter_totter.core.jsObj = function(a) {
+  return cljs.core.apply.call(null, cljs.core.js_obj, cljs.core.apply.call(null, cljs.core.concat, a))
 };
-var log__13909 = goog.debug.Logger.getLogger("DEBUG");
+var log__171151 = goog.debug.Logger.getLogger("DEBUG");
 de.karolski.teeter_totter.core.debug = function() {
   var a = function(a) {
-    return log__13909.info(cljs.core.reduce.call(null, cljs.core.str, "", a))
+    return log__171151.info(cljs.core.reduce.call(null, cljs.core.str, "", a))
   }, b = function(b) {
     var d = null;
     goog.isDef(b) && (d = cljs.core.array_seq(Array.prototype.slice.call(arguments, 0), 0));
@@ -22045,23 +22042,24 @@ de.karolski.teeter_totter.core.setup_environment = function() {
 }();
 goog.exportSymbol("de.karolski.teeter_totter.core.setup_environment", de.karolski.teeter_totter.core.setup_environment);
 de.karolski.teeter_totter.core.setup_connection = function() {
-  var a = new goog.net.BrowserChannel(8), b = new goog.net.BrowserChannel.Handler, c = goog.debug.Logger.getLogger("setup-connection");
-  handler__13927channelOpened = function() {
-    return c.info("Channel Opened")
+  var a = goog.debug.Logger.getLogger("Local"), b = new goog.net.BrowserChannel(8), c = new goog.net.BrowserChannel.Handler;
+  a.info("Setting up connection");
+  c.channelOpened = function() {
+    return a.info("Channel Opened")
   };
-  handler__13927channelClosed = function() {
-    return c.info("Channel Closed")
+  c.channelClosed = function() {
+    return a.info("Channel Closed")
   };
-  handler__13927channelError = function(a, b) {
-    return c.info("Channel Error:" + b)
+  c.channelError = function(b, c) {
+    return a.info("Channel Error:" + c)
   };
-  handler__13927channelHandleArray = function(a, b) {
-    c.info("Channel Handle Array:" + b);
-    return a.sendMap(de.karolski.teeter_totter.core.jsObj.call(null, cljs.core.ObjMap.fromObject(["\ufdd0'result"], {"\ufdd0'result":goog.json.serialize(eval(b))})))
+  c.channelHandleArray = function(b, c) {
+    a.info("Channel Handle Array:" + c);
+    return b.sendMap(de.karolski.teeter_totter.core.jsObj.call(null, cljs.core.ObjMap.fromObject(["result"], {result:goog.json.serialize(eval(c))})))
   };
-  c.info("Connecting to server through BrowserChannel");
-  a.setHandler(b);
-  return a.connect("channel/test", "channel/channel", de.karolski.teeter_totter.core.jsObj.call(null, cljs.core.ObjMap.EMPTY))
+  a.info("Connecting to server through BrowserChannel");
+  b.setHandler(c);
+  return b.connect("channel/test", "channel/channel", de.karolski.teeter_totter.core.jsObj.call(null, cljs.core.ObjMap.EMPTY))
 };
 goog.exportSymbol("de.karolski.teeter_totter.core.setup_connection", de.karolski.teeter_totter.core.setup_connection);
 de.karolski.teeter_totter.core.AConfigurable = {};

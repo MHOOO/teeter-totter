@@ -46,24 +46,25 @@
     (when debug?
       (.setCapturing console true))))
 
-
 (defn ^:export setup-connection
   "Establish a permanent connection with the server which allows the
   server to execute js code inside this clients browser."
   []
-  (let [bc (goog.net.BrowserChannel. 8)
-        handler (new goog.net.BrowserChannel.Handler) 
-        log (glogger/getLogger "setup-connection")]
+  (let [log (glogger/getLogger "Local")
+        bc (goog.net.BrowserChannel. 8)
+        handler (goog.net.BrowserChannel.Handler.)
+]
+    (.info log "Setting up connection")
     ;; setup events
-    (set! handler.channelOpened (fn [bc] (.info log "Channel Opened")))
-    (set! handler.channelClosed (fn [bc pending-maps undelivered-maps] (.info log "Channel Closed")))
-    (set! handler.channelError (fn [bc error] (.info log (+ "Channel Error:" error))))
+    (set! (.-channelOpened handler) (fn [bc] (.info log "Channel Opened")))
+    (set! (.-channelClosed handler) (fn [bc pending-maps undelivered-maps] (.info log "Channel Closed")))
+    (set! (.-channelError handler) (fn [bc error] (.info log (+ "Channel Error:" error))))
 
     ;; handle code by evaluating it and sending the result back to the client
-    (set! handler.channelHandleArray
+    (set! (.-channelHandleArray handler)
           (fn [bc array]
             (.info log (+ "Channel Handle Array:" array))
-            (.sendMap bc (jsObj {:result (gjson/serialize (js/eval array))}))))
+            (.sendMap bc (jsObj {"result" (gjson/serialize (js/eval array))}))))
     (.info log "Connecting to server through BrowserChannel")
     (.setHandler bc handler)
     (.connect bc "channel/test" "channel/channel" (jsObj {}))))
