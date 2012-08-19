@@ -1,14 +1,7 @@
-(ns de.karolski.teeter-totter.core
+(ns de.karolski.teeter-totter.core 
   (:require
    [goog.dom :as dom]
    [goog.object :as goog-object]
-   [goog.events.EventType :as goog-event-type]
-   [goog.ui.ColorButton :as color-button]
-   [goog.ui.Button :as button]
-   [goog.ui.Tab :as gtab]
-   [goog.ui.Dialog :as gdiag]
-   [goog.ui.LabelInput :as ginput]
-   [goog.ui.TabBar :as gtabb]
    [goog.net.BrowserChannel :as bc]
    [goog.debug.Logger :as glogger]
    [goog.debug.Console :as gconsole]
@@ -17,7 +10,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; HELPER FNs
-
 (defn ^:export jsArr
   "Recursively converts a sequential object into a JavaScript array"
   [seq]
@@ -87,21 +79,43 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; UIFramework API
+(defprotocol ^:extern AWidgetFactory
+  (-dialog [_ argmap] "Create a dialog.")
+  (-button [_ argmap] "Create a button.")
+  (-label [_ argmap] "Create a label.")
+  (-text [_ argmap] "Create an editable text field."))
+
+(defprotocol ^:extern APanelFactory
+  (-panel [_ argmap] "Create a horizontal/vertical panel."))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Config API
-(defprotocol AConfigurable
+(defprotocol ^:extern AConfigurable
   (-config [c key] "return the configuration value")
   (-config! [c kay val] "set the configuration value"))
 
-(defprotocol AConfigurableMap
+(defprotocol ^:extern AConfigurableMap
   (-config-map [c] "return the configuration map"))
 
-(defn ^:export config [c key]
+(defn ^:export config
+  "Return the configuration value for the specified key."
+  [c key]
   (-config c key))
 
-(defn ^:export config! [c key val]
+(defn ^:export config!
+  "Set the configuration value for the specified key."
+  [c key val]
   (-config! c key val))
 
-(defn ^:export config-map [c] 
+(defn ^:export config-map
+  "Return a map of 
+    KEY -> [GETTER SETTER]
+  where KEY is a keyword naming the configuration value, GETTER is a
+  function of one argument that returns the configuration value from
+  the passed in object and SETTER is a function of two arguments that
+  sets the configuration value for the passed in object." [c]
   (-config-map c))
 
 (defn ^:export config!-when
@@ -119,93 +133,50 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Listen API
-(defn event-kw->google-event
-  [event-kw]
-  (event-kw
-   ;; TODO: sync with seesaw event names
-   {:leave goog.ui.Component.EventType.LEAVE
-    :open goog.ui.Component.EventType.OPEN
-    :uncheck goog.ui.Component.EventType.UNCHECK
-    :focus goog.ui.Component.EventType.FOCUS
-    :hide goog.ui.Component.EventType.HIDE
-    :deactivate goog.ui.Component.EventType.DEACTIVATE
-    :close goog.ui.Component.EventType.CLOSE
-    :unhighlight goog.ui.Component.EventType.UNHIGHLIGHT
-    :highlight goog.ui.Component.EventType.HIGHLIGHT
-    :activate goog.ui.Component.EventType.ACTIVATE
-    :unselect goog.ui.Component.EventType.UNSELECT
-    :enter goog.ui.Component.EventType.ENTER
-    :before-show goog.ui.Component.EventType.BEFORE_SHOW
-    :enable goog.ui.Component.EventType.ENABLE
-    :check goog.ui.Component.EventType.CHECK
-    :show goog.ui.Component.EventType.SHOW
-    :select goog.ui.Component.EventType.SELECT
-    :action goog.ui.Component.EventType.ACTION
-    :change goog.ui.Component.EventType.CHANGE
-    :blur goog.ui.Component.EventType.BLUR
-    :disable goog.ui.Component.EventType.DISABLE}))
+;; UI Functions & Protocol implementations
+(def ^:dynamic +ui-framework+ (atom nil))
 
-(defn listen
+(defn ^:extern set-framework! [f]
+  (reset! +ui-framework+ f))
+
+(defn ^:extern framework []
+  @+ui-framework+)
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Listen API
+(defprotocol ^:export AEventBinder
+  (-bind-event [_ obj evnt cb] "Listen on an event & call the callback."))
+
+(defn ^:export listen
   ([c] c)
   ([c event-kw handler]
-     (doto c
-       (goog.events.listen (event-kw->google-event event-kw) handler)))
+     (-bind-event (framework) c event-kw handler))
   ([c & more]
      (doseq [[event-kw handler] (partition 2 more)]
        (listen c event-kw handler))))
 
 
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; UI Functions & Protocol implementations
+;; LINB GUI CONFIG
+(def +linb-widget-opt-map+
+  {})
 
+(def +linb-button-opt-map+
+  {})
 
-(def +component-opt-map+
-     ;; TODO: instead of calling (debug), call (error) or (throw)?
-     {:listen [(fn [e] (debug "NOT IMPLEMENTED!") nil) #(apply listen %1 %2)]
-      :visible? [#(.getVisible %1) #(.setVisible %1 %2)]
-      :items [(fn [e] (debug "NOT IMPLEMENTED!") nil) #(doseq [item %2]
-                                                         (.addChild %1 item true))]})
-
-(def +control-opt-map+
-     (merge +component-opt-map+
-      {:text [#(.getCaption %1) #(.setCaption %1 %2)]}))
-
-(def +button-opt-map+
-     (merge +component-opt-map+
-      {:text [#(.getContent %1) #(.setContent %1 %2)]
-       :tooltip [#(.getTooltip %1) #(.setTooltip %1 %2)]
-       :color [#(.getValue %1) #(.setValue %1 %2)]
-       :button-set [#(.getButtonSet %1) #(.setButtonSet %1 %2)]}))
-
-(def +dialog-opt-map+
-     (merge +component-opt-map+
-      {:title [#(.getTitle %1) #(.setTitle %1 %2)]}
-      {:modal? [#(.getModal %1) #(.setModal %1 %2)]}
-      ;; {:content [#(.getContent %1) #(.setContent %1 %2)]}
-      ;; This is more like in seesaw
-      {:content [#(.getChildAt %1 0) #(.addChildAt %1 %2 0 true)]}
-      ))
-
-
-(extend-type goog.ui.Component
+(extend-type linb.UI.Widget
   AConfigurable
   (-config [c key] ((get-in (config-map c) [key 0]) c))
   (-config! [c key val] ((get-in (config-map c) [key 1]) c val)))
 
 (extend-protocol AConfigurableMap
-  goog.ui.Component
-  (-config-map [c] +component-opt-map+)
-  goog.ui.Control
-  (-config-map [c] +control-opt-map+)
+  linb.UI.Widget
+  (-config-map [c] +linb-widget-opt-map+)
   
-  goog.ui.Dialog
-  (-config-map [c] +dialog-opt-map+)
-  goog.ui.Button
-  (-config-map [c] +button-opt-map+)) 
-
+  linb.UI.Button
+  (-config-map [c] +linb-button-opt-map+)) 
 
 
 (defn ^:export dialog
@@ -219,7 +190,7 @@
    :title   - string title
    :content - string html content
    :modal?  - true or false to set modality
-   :button-set  - one of the constants from goog.ui.Dialog.ButtonSet
+   :button-set  - :yes-no
    :on-select   - fn of one argument (the event). Event will have a key member with the users choice.
    :color   - string color value. Example: \"red\". "
   [& {:keys [content title
@@ -229,11 +200,11 @@
            items-visible? true
            }
       :as argmap}]
-  (let [dlg (goog.ui.Dialog.)]
+  (let [dlg (-dialog (framework) {})]
     (generic-configure! dlg argmap)
     ;; (goog.events.listen window "unload" (fn [] (goog.events.removeAll)))
     (when on-select
-      (goog.events.listen dlg goog.ui.Dialog.EventType.SELECT on-select)) 
+      (listen dlg :select on-select)) 
     ;; e.key would contain the key
     dlg))
 
@@ -242,9 +213,7 @@
   [& {:keys [text tooltip color]
       :or {text ""}
       :as argmap}]
-  (let [btn (if color
-              (goog.ui.ColorButton. text)
-              (goog.ui.Button. text))]
+  (let [btn (-button (framework) {})]
     (generic-configure! btn argmap) 
     btn))
 
@@ -252,33 +221,21 @@
   [& {:keys [text]
       :or {text ""}
       :as argmap}]
-  (let [lbl (goog.ui.LabelInput. text)]
+  (let [lbl (-text (framework) {})]
     (generic-configure! lbl argmap)
     lbl))
 
 (defn ^:export label
   [& {:keys [text]
       :as argmap}]
-  (let [lbl (goog.ui.Control.)]
+  (let [lbl (-label (framework) {})]
     (generic-configure! lbl argmap)
     lbl))
 
-(defn orientation-kw->google-orientation
-  [orientation-kw]
-  (orientation-kw
-   {:horizontal goog.ui.Container.Orientation.HORIZONTAL
-    :vertical goog.ui.Container.Orientation.VERTICAL}))
-
 (defn ^:export panel
   [& {:keys [orientation items] :or {orientation :horizontal} :as argmap}]
-  (let [c (goog.ui.Component.)]
-    (generic-configure! c argmap)
-    ;; update each child to be have inlineStyle
-    (if (and items (= orientation :horizontal))
-      (doseq [item items]
-        (goog.style.setInlineBlock (. item (getElement)))) ;; display: inline-block
-      (doseq [item items]
-        (goog.style.setStyle (. item (getElement)) "display" "block")))
+  (let [c (-panel (framework) {})]
+    (generic-configure! c argmap) 
     c))
 
 (defn ^:export horizontal-panel
@@ -288,39 +245,3 @@
 (defn ^:export vertical-panel
   [& args]
   (apply panel :orientation :vertical args))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Main program
-
-(defn ^:export main []
-  (setup-environment :debug? true)
-  (setup-connection)
-
-  (let [dlg (dialog :title "Hello There2!"
-                    :content
-                    (vertical-panel
-                     :items
-                     [(horizontal-panel
-                       :items [(label :text "Name")
-                               (text :text "Joe Smith")])
-                      (horizontal-panel
-                       :items [(label :text "E-Mail")
-                               (text :text "Joe.Smith@template.com")])
-                      (horizontal-panel
-                       :items [(button :text "Push me!"
-                                       :tooltip "Not implemented"
-                                       :color "green"
-                                       :listen [:action (fn [e] (debug "Button clicked!"))])])])
-                    
-                    )] 
-    (.setVisible dlg true))
-
-
-  
-  (let [log (glogger/getLogger "Local")]
-    (.info log "Hallo Welt! Ich war hier!")
-    (.render
-     (button :text "Database" :tooltip "Database Connection Status" :color "red")
-     (.getElement goog.dom "buttons"))))

@@ -26,7 +26,9 @@
         :compiler {
                    :output-to "static/js-out/hello/hello.js" 
                    :optimizations :simple
-                   :pretty-print true}}]}
+                   :pretty-print true
+                   :externs ["externs/linb-min.js"]
+                   }}]}
 
   :profiles {:dev
              {:dependencies

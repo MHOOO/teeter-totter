@@ -19,9 +19,6 @@
    [:head
     [:script {:type "text/javascript" :src "/static/closure-library/closure/goog/base.js"}]
 
-    ;; teeter-totter library (TODO: rename)
-    [:script {:type "text/javascript" :src "/static/js-out/hello/hello.js"}]
-
     ;; jslinb files
     [:script {:type "text/javascript" :src "/static/linb/runtime/jsLinb/js/linb-all.js"}]
     [:script {:type "text/javascript" :src "/static/linb/runtime/jsLinb/js/adv-all.js"}]
@@ -32,12 +29,17 @@
     [:link {:rel "stylesheet" :href "/static/css/dialog.css"}]
     [:link {:rel "stylesheet" :href "/static/css/button.css"}]
     [:link {:rel "stylesheet" :href "/static/css/menubutton.css"}]
-    [:link {:rel "stylesheet" :href "/static/css/colormenubutton.css"}]]
+    [:link {:rel "stylesheet" :href "/static/css/colormenubutton.css"}]
+
+    ;; teeter-totter library (TODO: rename)
+    [:script {:type "text/javascript" :src "/static/js-out/hello/hello.js"}]
+
+    ]
    [:body {:onload
            ;; setup teeter-totter
            (js
-            (goog.require "de.karolski.teeter_totter.core")
-            (de.karolski.teeter-totter.core.main))}
+            (goog.require "de.karolski.teeter_totter.example")
+            (de.karolski.teeter-totter.example.main))}
     [:div#logdiv]]])
 
 (defn xmlhttp-chunk-seq [& {:keys [wait] :or {wait 2000}}]
@@ -61,43 +63,9 @@
   (let [encoded-data (json/encode (map-indexed (fn [i d] [(+ start-index i) d]) data))]
     (str (count encoded-data) "\n" encoded-data)))
 
-(defn gen-session-id
-  "Generate a random session id."
-  []
-  (reduce str "" (repeatedly 16 (partial rand-int 10))))
-
-(defonce ^{:doc "Ref containing a map of all sessions. Where keys are
-session ids and keys are client maps."} +sessions+ (ref {}))
-
-(defonce +session-recv-channel+ (permanent-channel))
-
-(defn add-session
-  "Add a session to the session map. It must have a :sid key."
-  [sess]
-  (debug "Adding session: " sess)
-  (enqueue +session-recv-channel+ sess)
-  sess)
-
-(defn sessions
-  "Returns a map of all sessions. Where each key is the session-id and
-  the value the session/client map."
-  [] @+sessions+)
-
-(defonce +ping-thread-active+ (atom false))
-
-(defn remove-old-sessions
-  []
-  (dosync
-   (alter +sessions+
-          (fn [sessions]
-            (let [keys (map :sid (filter #(< (+ (:last-active %) 60e9)
-                                             (System/nanoTime))
-                                         (vals sessions)))]
-              (if (not (empty? keys))
-                (println "Removing sessions:" keys))
-              (apply dissoc sessions
-                     keys))))))
-
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; BROADCAST CHANNEL
+;;
 ;; the global channel. Anything sent to it will go to any client
 (defonce +broadcast-channel+
   (doto (permanent-channel)
@@ -114,24 +82,66 @@ session ids and keys are client maps."} +sessions+ (ref {}))
   [& body]
   `(broadcast-eval* (js ~@body)))
 
-(doall
- (map
-  receive-all
-  (repeat +session-recv-channel+)
-  [ ;; add the session to the session map
-   (fn [session] (dosync (alter +sessions+ (fn [sessions] (assoc sessions (:sid session) session)))))
-   ;; remove any old sessions from the session map
-   (fn [_] (remove-old-sessions))
-   ;; in case the ping thread is not active, activate it
-   (fn [_] (when (not @+ping-thread-active+)
-             (reset! +ping-thread-active+ true)
-             (future
-               (while @+ping-thread-active+
-                 (Thread/sleep 30000)
-                 (remove-old-sessions)
-                 (if (empty? (sessions))
-                   (reset! +ping-thread-active+ false)
-                   (broadcast-eval "noop"))))))]))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; SESSION
+;;
+(defn gen-session-id
+  "Generate a random session id."
+  []
+  (reduce str "" (repeatedly 16 (partial rand-int 10))))
+
+(defonce ^{:doc "Ref containing a map of all sessions. Where keys are
+session ids and keys are client maps."} +sessions+ (ref {}))
+
+(defn sessions
+  "Returns a map of all sessions. Where each key is the session-id and
+  the value the session/client map."
+  [] @+sessions+)
+
+(defn remove-old-sessions
+  []
+  (dosync
+   (alter +sessions+
+          (fn [sessions]
+            (let [keys (map :sid (filter #(< (+ (:last-active %) 60e9)
+                                             (System/nanoTime))
+                                         (vals sessions)))]
+              (if (not (empty? keys))
+                (println "Removing sessions:" keys))
+              (apply dissoc sessions
+                     keys))))))
+
+(defonce +ping-thread-active+ (atom false))
+(def +ping-interval+ 15000)
+(defonce +session-recv-channel+
+  (let [chan (permanent-channel)]
+    (doall
+     (map
+      receive-all
+      (repeat chan)
+      [ ;; add the session to the session map
+       (fn [session] (dosync (alter +sessions+ (fn [sessions] (assoc sessions (:sid session) session)))))
+       ;; remove any old sessions from the session map
+       (fn [_] (remove-old-sessions))
+       ;; in case the ping thread is not active, activate it
+       (fn [_] (when (not @+ping-thread-active+)
+                 (reset! +ping-thread-active+ true)
+                 (future
+                   (while @+ping-thread-active+
+                     (Thread/sleep +ping-interval+)
+                     (remove-old-sessions)
+                     (if (empty? (sessions))
+                       (reset! +ping-thread-active+ false)
+                       (broadcast-eval "noop"))))))]))
+    chan))
+
+(defn add-session
+  "Add a session to the session map. It must have a :sid key."
+  [sess]
+  (debug "Adding session: " sess)
+  (enqueue +session-recv-channel+ sess)
+  sess)
 
 (defn update-client
   "Update the client with the specified session id using the function f."
@@ -326,7 +336,7 @@ session ids and keys are client maps."} +sessions+ (ref {}))
   (broadcast-eval
    (do
      (linb.message "Reloading file")
-     (goog.Timer.callOnce (fn [] (window.location.reload)) 750))))
+     (goog.Timer.callOnce (fn [] (window.location.reload)) 150))))
 
 (watcher ["static/js-out/hello/"]
          (rate 150)
