@@ -99,7 +99,7 @@ session ids and keys are client maps."} +sessions+ (ref {}))
                      keys))))))
 
 ;; the global channel. Anything sent to it will go to any client
-(def +broadcast-channel+
+(defonce +broadcast-channel+
   (doto (permanent-channel)
     (receive-all #(debug "Message put into +broadcast-channel+: " %))))
 
@@ -107,10 +107,7 @@ session ids and keys are client maps."} +sessions+ (ref {}))
   "Evaluate the javascript code given as a string on *all* connected clients
   browsers."
   [js-str]
-  (enqueue +broadcast-channel+ [js-str])
-  ;; ensure the result is popped from the forward channel
-  (doseq [ch (map :forward-channel (vals (sessions)))]
-    (receive ch identity)))
+  (enqueue +broadcast-channel+ [js-str]))
 
 (defmacro broadcast-eval
   "Like BROADCAST-EVAL*, but wraps BODY inside a (js ...) form."
@@ -147,6 +144,9 @@ session ids and keys are client maps."} +sessions+ (ref {}))
   [& {:keys [sid version host-prefix] :or {version 8 host-prefix ""}}]
   (let [sid (or sid (gen-session-id))
         fc (doto (channel)
+             ;; this line serves two purposes: First, it'll update the
+             ;; time of the client and second it will ensure forward
+             ;; messages do not queue up!
              (receive-all (fn [_] (update-client sid (fn [client] (assoc client :last-active (System/nanoTime))))))
              )]
     {:last-active (System/nanoTime)
@@ -321,14 +321,15 @@ session ids and keys are client maps."} +sessions+ (ref {}))
 
 
 ;; send message to all client when js file changed
-(defonce file-watcher
-  (watcher ["static/js-out/hello/"]
-           (rate 150)
-           (file-filter (extensions :js))
-           (on-change
-            (fn [_]
-              (debug "broadcasting updates")
-              (broadcast-eval
-               (do
-                 (linb.message "Reloading js file")
-                 (goog.require "de.karolski.teeter-totter.core")))))))
+(defn file-watcher-handler []
+  (debug "broadcasting updates")
+  (broadcast-eval
+   (do
+     (linb.message "Reloading file")
+     (goog.Timer.callOnce (fn [] (window.location.reload)) 750))))
+
+(watcher ["static/js-out/hello/"]
+         (rate 150)
+         (file-filter (extensions :js))
+         (on-change
+          (fn [_] (file-watcher-handler))))

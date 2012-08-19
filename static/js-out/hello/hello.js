@@ -22008,10 +22008,10 @@ de.karolski.teeter_totter.core.jsObj = function(a) {
   return cljs.core.apply.call(null, cljs.core.js_obj, cljs.core.apply.call(null, cljs.core.concat, a))
 };
 goog.exportSymbol("de.karolski.teeter_totter.core.jsObj", de.karolski.teeter_totter.core.jsObj);
-var log__188649 = goog.debug.Logger.getLogger("DEBUG");
+var log__296049 = goog.debug.Logger.getLogger("DEBUG");
 de.karolski.teeter_totter.core.debug = function() {
   var a = function(a) {
-    return log__188649.info(cljs.core.reduce.call(null, cljs.core.str, "", a))
+    return log__296049.info(cljs.core.reduce.call(null, cljs.core.str, "", a))
   }, b = function(b) {
     var d = null;
     goog.isDef(b) && (d = cljs.core.array_seq(Array.prototype.slice.call(arguments, 0), 0));
@@ -22076,17 +22076,6 @@ de.karolski.teeter_totter.core.setup_connection = function() {
   return b.connect("channel/test", "channel/channel", de.karolski.teeter_totter.core.jsObj.call(null, cljs.core.ObjMap.EMPTY))
 };
 goog.exportSymbol("de.karolski.teeter_totter.core.setup_connection", de.karolski.teeter_totter.core.setup_connection);
-de.karolski.teeter_totter.core.test_exceptions = function() {
-  try {
-    return de.karolski.teeter_totter.core.dummy231.call(null)
-  }catch(a) {
-    if(cljs.core.instance_QMARK_.call(null, Error, a)) {
-      return null
-    }
-    throw a;
-  }
-};
-goog.exportSymbol("de.karolski.teeter_totter.core.test_exceptions", de.karolski.teeter_totter.core.test_exceptions);
 de.karolski.teeter_totter.core.AConfigurable = {};
 de.karolski.teeter_totter.core._config = function(a, b) {
   if(a ? a.de$karolski$teeter_totter$core$AConfigurable$_config$arity$2 : a) {

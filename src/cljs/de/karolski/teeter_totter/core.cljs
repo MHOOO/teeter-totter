@@ -68,7 +68,7 @@
             (let [log (glogger/getLogger "Local")]
               (.info log (+ "Channel Handle Array:" array))
               (let [[result error]
-                    (try
+                    (try 
                       [(js/eval array) nil]
                       (catch js/Error e
                         (.info log (+ "EVAL ERROR: " e))
@@ -84,11 +84,6 @@
     (.setHandler bc handler)
     (.connect bc "channel/test" "channel/channel" (jsObj {}))))
 
-
-(defn ^:export test-exceptions []
-  (try (dummy231)
-       (catch js/Error e
-         nil)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
