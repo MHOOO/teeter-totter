@@ -147,6 +147,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Listen API
 (defprotocol ^:export AEventBinder
+  (-bind-event [_ evnt cb] "Listen on an event & call the callback.")
   (-bind-event [_ obj evnt cb] "Listen on an event & call the callback."))
 
 (defn ^:export listen
@@ -156,27 +157,6 @@
   ([c & more]
      (doseq [[event-kw handler] (partition 2 more)]
        (listen c event-kw handler))))
-
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; LINB GUI CONFIG
-(def +linb-widget-opt-map+
-  {})
-
-(def +linb-button-opt-map+
-  {})
-
-(extend-type linb.UI.Widget
-  AConfigurable
-  (-config [c key] ((get-in (config-map c) [key 0]) c))
-  (-config! [c key val] ((get-in (config-map c) [key 1]) c val)))
-
-(extend-protocol AConfigurableMap
-  linb.UI.Widget
-  (-config-map [c] +linb-widget-opt-map+)
-  
-  linb.UI.Button
-  (-config-map [c] +linb-button-opt-map+)) 
 
 
 (defn ^:export dialog

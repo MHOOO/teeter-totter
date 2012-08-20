@@ -25,7 +25,7 @@
         ; (See the ClojureScript compiler documentation for details.)
         :compiler {
                    :output-to "static/js-out/hello/hello.js" 
-                   :optimizations :simple
+                   :optimizations :whitespace
                    :pretty-print true
                    :externs ["externs/linb-min.js"]
                    }}]}

@@ -51,7 +51,7 @@
   (-label [_ argmap] (goog.ui.Control.))
   (-text [_ argmap] (goog.ui.LabelInput.)) 
 
-  AEventBinder
+  AEventBinder 
   (-bind-event [_ obj event-kw cb]
     (goog.events.listen obj (or (event-kw->google-event event-kw) event-kw) cb))
 
@@ -72,7 +72,7 @@
 
 (def +component-opt-map+
      ;; TODO: instead of calling (debug), call (error) or (throw)?
-     {:listen [(fn [e] (debug "NOT IMPLEMENTED!") nil) #(apply listen %1 %2)]
+     {:listen [(fn [e] (throw (js/Error. "Not implemented"))) #(apply listen %1 %2)]
       :visible? [#(.getVisible %1) #(.setVisible %1 %2)]
       :items [(fn [c] (map #(.getChild c %) (.getChildIds c)))
               #(doseq [item %2]
@@ -95,8 +95,6 @@
      (merge +component-opt-map+
       {:title [#(.getTitle %1) #(.setTitle %1 %2)]}
       {:modal? [#(.getModal %1) #(.setModal %1 %2)]}
-      ;; {:content [#(.getContent %1) #(.setContent %1 %2)]}
-      ;; This is more like in seesaw
       {:content [#(.getChildAt %1 0) #(.addChildAt %1 %2 0 true)]}
       ))
 
