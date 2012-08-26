@@ -89,6 +89,12 @@
 (defprotocol ^:extern APanelFactory
   (-panel [_ argmap] "Create a horizontal/vertical panel."))
 
+(defprotocol ^:extern PropertyChangeManager
+  (-add-listener [framework widget option-kw handler] "Call handler with new
+  value when the option changes on widget.")
+  (-remove-listener [framework widget option-kw handler] "Remove the
+  handler to be called upon the changed property."))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Config API
@@ -147,8 +153,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Listen API
 (defprotocol ^:export AEventBinder
-  (-bind-event [_ evnt cb] "Listen on an event & call the callback.")
-  (-bind-event [_ obj evnt cb] "Listen on an event & call the callback."))
+  (-bind-event [_ obj evnt cb] [_ evnt cb] "Listen on an event & call the callback."))
 
 (defn ^:export listen
   ([c] c)

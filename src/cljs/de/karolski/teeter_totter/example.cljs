@@ -2,8 +2,7 @@
   (:require
    [de.karolski.teeter-totter.core :as c]
    [de.karolski.teeter-totter.frameworks.google :as g]
-   [de.karolski.teeter-totter.frameworks.linb :as l]
-   [goog.debug.Logger :as glogger]))
+   [de.karolski.teeter-totter.frameworks.linb :as l]))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
