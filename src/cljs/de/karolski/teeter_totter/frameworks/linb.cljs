@@ -1,17 +1,19 @@
 (ns de.karolski.teeter-totter.frameworks.linb
   (:use [de.karolski.teeter-totter.core :only [PropertyChangeManager AConfigurable AConfigurableMap AWidgetFactory APanelFactory AEventBinder debug listen config config!]]
         [de.karolski.teeter-totter.bind :only [ToBindable]]
-        [de.karolski.teeter-totter.util :only [keywordize-map-keys stringify-map-keys clj->js]])
+        [de.karolski.teeter-totter.util :only [keywordize-map-keys stringify-map-keys clj->js Children ASimpleNameable]])
   (:require-macros [de.karolski.teeter-totter.util :as m])
   (:require
    [de.karolski.teeter-totter.core :as c]
-   [de.karolski.teeter-totter.bind :as b]))
+   [de.karolski.teeter-totter.bind :as b]
+   [de.karolski.teeter-totter.util :as u]))
 
 (deftype Framework [])
 
 (def property-kw->property-name
   {:text "value"
-   :title "caption"})
+   :title "caption"
+   :value "value"})
 
 (extend-type Framework 
   AWidgetFactory 
@@ -80,7 +82,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; LINB GUI CONFIG
 (def +linb-ui-opt-map+
-  {:visible? [#(.hide %) #(.show %1)]
+  {:id [#(.getAlias %) #(.setAlias %1 %2)]
+   :visible? [#(.hide %) #(.show %1)]
    :margin [#(keywordize-map-keys (js->clj (.getDockMargin %)))
             #(.setDockMargin
               %1
@@ -96,14 +99,15 @@
                       (.setDock item "left")) 
                     (doseq [item (config %1 :items)]
                       (.setDock item "top")))]
-   :items [#(map (fn [i] (.-_cacheInstance i)) (.get (.getChildren %)))
+   :items [#(u/children %)
            #(doseq [item %2]
               (doto item
                 (.setDock "left"))
               (.append %1 item))]})
 
 (def +linb-button-opt-map+
-  (merge +linb-ui-opt-map+ {:text [#(.getCaption %) #(.setCaption %1 %2)]}))
+  (merge +linb-ui-opt-map+ {:text [#(.getCaption %) #(.setCaption %1 %2)]
+                            :value [#(.getValue %) #(.setValue %1 %2)]}))
 
 (def +linb-label-opt-map+
   +linb-button-opt-map+)
@@ -114,6 +118,8 @@
                    +linb-button-opt-map+)
   linb.UI.Label (-config-map [c]
                    +linb-label-opt-map+)
+  linb.UI.CheckBox (-config-map [c]
+                     +linb-button-opt-map+)
   linb.UI.Block (-config-map [c]
                    (merge +linb-label-opt-map+
                           {:border-type [#(.getBorderType %) #(.setBorderType %1 (name %2))]}))
@@ -137,6 +143,15 @@
     (to-bindable* [this] (b/selection this))
   linb.UI.Label
     (to-bindable* [this] (b/property this :text)))
+
+
+(extend-protocol Children
+  linb.UI
+  (children [this] (map (fn [i] (.-_cacheInstance i)) (.get (.getChildren this)))))
+
+(extend-protocol ASimpleNameable
+  linb.UI
+  (get-simple-name [this] (second (clojure.string/split (.-key this) #"\." 2))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
