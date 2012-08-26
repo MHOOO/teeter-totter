@@ -19,16 +19,17 @@
 
   :cljsbuild {
     :builds [{
-        ; The path to the top-level ClojureScript source directory:
-        :source-path "src/cljs"
-        ; The standard ClojureScript compiler options:
-        ; (See the ClojureScript compiler documentation for details.)
-        :compiler {
-                   :output-to "static/js-out/hello/hello.js" 
-                   :optimizations :whitespace
-                   :pretty-print true
-                   :externs ["externs/linb-min.js"]
-                   }}]}
+              ;; The path to the top-level ClojureScript source directory:
+              :source-path "src/cljs"
+              :incremental false
+              ;; The standard ClojureScript compiler options:
+              ;; (See the ClojureScript compiler documentation for details.)
+              :compiler {
+                         :output-to "static/js-out/hello/hello.js" 
+                         :optimizations :whitespace
+                         :pretty-print true
+                         :externs ["externs/linb-min.js"]
+                         }}]}
 
   :profiles {:dev
              {:dependencies
