@@ -63,3 +63,21 @@
    Basically this involves partly porting the Seesaw API to ClojureScript.
    - [ ] frame(?)/panel/dialog
    - [ ] button/radio/checkbox
+** TODO Connection between browser & engine
+   - browser request access to specific API's and gets a handle to
+     those
+     - different API's for different uses
+     - this makes it possible to see at a glance what a widget does
+       and whether it is potentially insecure
+* Linb
+** Node from HTML id attribute
+   In order to get the DOM Node of an item with a particular HTML id
+   attribute, use:
+   linb.getNode(linb.getId("<id>")),
+   wher <id> could be: linb.UI.Input-INPUT:l:
+** Find UI Object by alias (as used inside the js-code from the builder)
+   linb.UI.getFromDom(_.filter(linb.UI.getAll()._nodes, function(e,i){return e.alias == "ctl_sbutton1" && e.prepared == true})[0].getDomId())
+
+   The object can then be used like inside the builder.
+
+   It is possible that the flag prepared (== true) only exists inside the builder to mark the "true" object and not any dummies.

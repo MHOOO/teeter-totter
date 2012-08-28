@@ -1,2 +1,5 @@
-* Work in progress
-  Not much more to say. Still much to do.
+* Work in Progress
+* Introduction
+  Teeter Totter is to HTML, what Seesaw is to Swing. It is a
+  ClojureScript library for creating user interfaces the seesaw way,
+  i.e. in a functional manner.
