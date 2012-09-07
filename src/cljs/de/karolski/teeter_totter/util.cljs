@@ -1,13 +1,8 @@
-(ns de.karolski.teeter-totter.util)
-
-(defn class-for-name
-  "Currently just resolves the name and returns that."
-  [name] name)
-
-(defprotocol AClass)
+(ns de.karolski.teeter-totter.util
+  (:use [clojure.string :only [split]]))
 
 (defprotocol AInstance
-  (class-of [_] "Returns the class (i.e. prototype) of the object."))
+  (class-of* [_] "Returns the class (i.e. prototype) of the object."))
 
 (defprotocol ASimpleNameable
   (get-simple-name [this]))
@@ -17,6 +12,22 @@
   This takes care of idiosyncracies of frame vs. menus, etc."
 
   (children [c] "Returns a seq of the children of the given widget"))
+
+(defn class-for-name
+  "Return the class that has the specified fully qualified name."
+  [name]
+  (apply aget (js* "window") (split name #"\.")))
+
+(defn class-of
+  "Return the class of the given instance."
+  [obj]
+  (class-of* obj))
+
+(defn is-instance?
+  "Return true if OBJ is of instance class CLS. Currenlty only works
+  if CLS is the direct superclass as returned by AInstance/class-of*"
+  [cls obj]
+  (= (class-of obj) cls))
 
 ;; necessary for selector.cljs
 (js*

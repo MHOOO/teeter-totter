@@ -8,12 +8,13 @@
 ;   the terms of this license.
 ;   You must not remove this notice, or any other, from this software.
 
-(ns seesaw.selector
+(ns de.karolski.teeter-totter.selector
   "Teeter-totter selector support, based largely upon seesaw, which in turn is based on enlive-html.
   https://github.com/cgrand/enlive
 
   There's no need to ever directly require this namespace. Use (teeter-totter.core/select)! "
-  (:require [de.karolski.teeter-totter.util :as ssu]
+  (:use [clojure.string :only [split]])
+  (:require [de.karolski.teeter-totter.util :as ssu] 
             [clojure.zip :as z]))
 
 ; This code is the HTML selector code for Enlive with modifications to support
@@ -21,7 +22,7 @@
 ; locked down because other than the (select) function, I don't know what
 ; I want to expose yet.
 
-(defprotocol Selectable
+(defprotocol ASelectable
   (id-of* [this])
   (id-of!* [this id])
   (class-of* [this])
@@ -149,16 +150,15 @@
   (pred #(= (-> % id-of) (keyword id))))
 
 
-;; TODO: Class/forName -> class-for-name?
 (defn- exact-type=
   [class-name]
-  (let [cls (Class/forName class-name)]
-    (pred #(do (= (class %) cls) ))))
+  (let [cls (ssu/class-for-name class-name)]
+    (pred #(do (= (ssu/class-of %) cls) ))))
 
 (defn- loose-type=
   [class-name]
-  (let [cls (Class/forName class-name)]
-    (pred #(.isInstance cls %))))
+  (let [cls (ssu/class-for-name class-name)]
+    (pred #(ssu/is-instance? cls %))))
 
 (defn- attr-has
  "Selector predicate, tests if the specified whitespace-seperated attribute contains the specified values. See CSS ~="
@@ -195,7 +195,7 @@
     (if (.endsWith class-name "!")
       (cons (str "+" (subs class-name 0 (dec (count class-name)))) (remove empty? more))
       (cons (str "*" class-name) (remove empty? more)))
-    (seq (.split s "(?=[#.])"))))
+    (seq (split s #"(?=[#.])"))))
 
 (def ^{:private true} compile-keyword
   (memoize

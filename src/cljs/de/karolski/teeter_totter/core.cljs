@@ -1,5 +1,6 @@
 (ns de.karolski.teeter-totter.core 
   (:require
+   [de.karolski.teeter-totter.selector :as sel]
    [goog.dom :as dom]
    [goog.object :as goog-object]
    [goog.net.BrowserChannel :as bc]
@@ -25,6 +26,8 @@
 (let [log (glogger/getLogger "DEBUG")]
  (defn ^:export debug [& args]
    (.info log (reduce str "" args))))
+
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Connection
@@ -230,3 +233,78 @@
 (defn ^:export vertical-panel
   [& args]
   (apply panel :orientation :vertical args))
+
+
+(defn select
+  "Select a widget using the given selector expression. Selectors are *always*
+   expressed as a vector. root is the root of the widget hierarchy to select
+   from, usually either a (frame) or other container.
+
+    (select root [:#id])          Look up widget by id. A single widget is
+                                  always returned.
+
+    (select root [:tag])          Look up widgets by \"tag\". In Seesaw tag is
+                                  treated as the exact simple class name of a
+                                  widget, so :JLabel would match both
+                                  javax.swing.JLabel *and* com.me.JLabel.
+                                  Be careful!
+
+    (select root [:<class-name>]) Look up widgets by *fully-qualified* class name.
+                                  Matches sub-classes as well. Always returns a
+                                  sequence of widgets.
+
+    (select root [:<class-name!>]) Same as above, but class must match exactly.
+
+    (select root [:*])             Root and all the widgets under it
+
+  Notes:
+    This function will return a single widget *only* in the case where the selector
+    is a single identifier, e.g. [:#my-id]. In *all* other cases, a sequence of
+    widgets is returned. This is for convenience. Select-by-id is the common case
+    where a single widget is almost always desired.
+
+  Examples:
+
+    To find a widget by id from an event handler, use (to-root) on the event to get
+    the root and then select on the id:
+
+      (fn [e]
+        (let [my-widget (select (to-root e) [:#my-widget])]
+          ...))
+
+    Disable all JButtons (excluding subclasses) in a hierarchy:
+
+      (config! (select root [:<javax.swing.JButton>]) :enabled? false)
+
+    More:
+
+      ; All JLabels, no sub-classes allowed
+      (select root [:<javax.swing.JLabel!>])
+
+      ; All JSliders that are descendants of a JPanel with id foo
+      (select root [:JPanel#foo :JSlider])
+
+      ; All JSliders (and sub-classes) that are immediate children of a JPanel with id foo
+      (select root [:JPanel#foo :> :<javax.swing.JSlider>])
+
+      ; All widgets with class foo. Set the class of a widget with the :class option
+      (flow-panel :class :my-class) or (flow-panel :class #{:class1 :class2})
+      (select root [:.my-class])
+      (select root [:.class1.class2])
+
+      ; Select all text components with class input
+      (select root [:<javax.swing.text.JTextComponent>.input])
+
+      ; Select all descendants of all panels with class container
+      (select root [:JPanel.container :*])
+
+  See:
+    (seesaw.selector/select)
+    https://github.com/cgrand/enlive
+  "
+  ([root selector]
+    ;; (check-args (vector? selector) "selector must be vector")
+    (let [root root ;; (to-widget root)
+          result (sel/select root selector)
+          id? (and (nil? (second selector)) (sel/id-selector? (first selector)))]
+      (if id? (first result) result))))

@@ -1,7 +1,8 @@
 (ns de.karolski.teeter-totter.frameworks.linb
   (:use [de.karolski.teeter-totter.core :only [PropertyChangeManager AConfigurable AConfigurableMap AWidgetFactory APanelFactory AEventBinder debug listen config config!]]
         [de.karolski.teeter-totter.bind :only [ToBindable]]
-        [de.karolski.teeter-totter.util :only [keywordize-map-keys stringify-map-keys clj->js Children ASimpleNameable]])
+        [de.karolski.teeter-totter.util :only [keywordize-map-keys stringify-map-keys clj->js Children ASimpleNameable AInstance class-for-name class-of]]
+        [de.karolski.teeter-totter.selector :only [ASelectable]])
   (:require-macros [de.karolski.teeter-totter.util :as m])
   (:require
    [de.karolski.teeter-totter.core :as c]
@@ -136,7 +137,16 @@
 (extend-type linb.UI
   AConfigurable 
   (-config [c key] ((get-in (c/config-map c) [key 0]) c))
-  (-config! [c key val] ((get-in (c/config-map c) [key 1]) c val)))
+  (-config! [c key val] ((get-in (c/config-map c) [key 1]) c val))
+
+  AInstance
+  (class-of* [this] (class-for-name (.-KEY this)))
+
+  ASelectable
+  (id-of* [this] (. this (getAlias)))
+  (id-of!* [this id] (. this (setAlias id)))
+  (class-of* [this] (class-of this))
+  (class-of!* [this classes] (throw (js/Error "Unsupported operation!"))))
 
 (extend-protocol ToBindable
   linb.UI.Button
@@ -176,4 +186,3 @@
 (inherit-protocols linb.UI.Block linb.UI.Widget)
 (inherit-protocols linb.UI.Panel linb.UI)
 (inherit-protocols linb.UI.Pane linb.UI)
-

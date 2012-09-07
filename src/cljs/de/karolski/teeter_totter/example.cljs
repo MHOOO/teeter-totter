@@ -12,16 +12,17 @@
 
 (defn example1 []
   (let [dlg (c/dialog
-             :id "dialog"
+             :id :dialog
              :title "Hello There2!"
              :content
              (c/vertical-panel
+              :id :vpanel
               :items
               [(c/horizontal-panel
                 :height 30
                 :margin {:top 5}
                 :items [(c/label :text "Name")
-                        (c/text :text "Joe Smith")])
+                        (c/text :id :name :text "Joe Smith")])
                (c/horizontal-panel
                 :height 30
                 :margin {:top 5}
@@ -36,7 +37,9 @@
                                   :listen [:action (fn [e] (c/debug "Button clicked!"))])])])
                     
              )] 
-    (c/config! dlg :visible? true)))
+    (c/config! dlg :visible? true)
+    (c/debug "Selecting: " (c/config (c/select dlg [:#dialog]) :id))
+    ))
 
 ;; (defn example2 []
 ;;   (let [log (glogger/getLogger "Local")]
