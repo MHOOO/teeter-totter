@@ -1,5 +1,14 @@
 (ns de.karolski.teeter-totter.util)
 
+(defn class-for-name
+  "Currently just resolves the name and returns that."
+  [name] name)
+
+(defprotocol AClass)
+
+(defprotocol AInstance
+  (class-of [_] "Returns the class (i.e. prototype) of the object."))
+
 (defprotocol ASimpleNameable
   (get-simple-name [this]))
 

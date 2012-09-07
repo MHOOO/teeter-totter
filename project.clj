@@ -36,7 +36,8 @@
               [[robert/hooke "1.1.0"]
                [watchtower "0.1.1" :exclusions [org.clojure/clojure]]]}}
   
-  :plugins [[lein-cljsbuild "0.2.5"]]
+  :plugins [[lein-cljsbuild "0.2.5"]
+            [lein-swank "1.4.4"]]
   :exclusions [org.clojure/clojure-contrib]
   :min-lein-version "2.0.0"
   :description "FIXME: write description"
