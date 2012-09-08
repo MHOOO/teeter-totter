@@ -1,10 +1,10 @@
-(ns de.karolski.teeter-totter.core 
+(ns de.karolski.teeter-totter.core
+  (:use [de.karolski.teeter-totter.util :only [debug info]])
   (:require
    [de.karolski.teeter-totter.selector :as sel]
    [goog.dom :as dom]
    [goog.object :as goog-object]
    [goog.net.BrowserChannel :as bc]
-   [goog.debug.Logger :as glogger]
    [goog.debug.Console :as gconsole]
    [goog.json :as gjson]))
 
@@ -23,17 +23,12 @@
   [obj]
   (apply js-obj (apply concat obj)))
 
-(let [log (glogger/getLogger "DEBUG")]
- (defn ^:export debug [& args]
-   (.info log (reduce str "" args))))
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Connection
 (defn ^:export setup-environment
   [& {:keys [debug?]}]
-  ;; enable logging into firebug
   (let [console (goog.debug.Console.)]
     ;; remove stuff from browserchannel
     ;; (.addFilter console "goog.net.BrowserChannel")
@@ -47,35 +42,33 @@
   "Establish a permanent connection with the server which allows the
   server to execute js code inside this clients browser."
   []
-  (let [log (glogger/getLogger "Local")
-        bc (goog.net.BrowserChannel. 8)
+  (let [bc (goog.net.BrowserChannel. 8)
         handler (goog.net.BrowserChannel.Handler.)
 ]
-    (.info log "Setting up connection")
+    (info "Setting up connection")
     ;; setup events
-    (set! (.-channelOpened handler) (fn [bc] (.info log "Channel Opened")))
-    (set! (.-channelClosed handler) (fn [bc pending-maps undelivered-maps] (.info log "Channel Closed")))
-    (set! (.-channelError handler) (fn [bc error] (.info log (+ "Channel Error:" error))))
+    (set! (.-channelOpened handler) (fn [bc] (info "Channel Opened")))
+    (set! (.-channelClosed handler) (fn [bc pending-maps undelivered-maps] (info "Channel Closed")))
+    (set! (.-channelError handler) (fn [bc error] (info (+ "Channel Error:" error))))
 
     ;; handle code by evaluating it and sending the result back to the client
     (set! (.-channelHandleArray handler)
           (fn [bc array]
-            (let [log (glogger/getLogger "Local")]
-              (.info log (+ "Channel Handle Array:" array))
-              (let [[result error]
-                    (try 
-                      [(js/eval array) nil]
-                      (catch js/Error e
-                        (.info log (+ "EVAL ERROR: " e))
-                        [nil e]))
-                    data (if error
-                           {"error" error}
-                           {"result" (gjson/serialize result)})
-                    ]
-                (.sendMap
-                 bc
-                 (jsObj data))))))
-    (.info log "Connecting to server through BrowserChannel")
+            (info (+ "Channel Handle Array:" array))
+            (let [[result error]
+                  (try 
+                    [(js/eval array) nil]
+                    (catch js/Error e
+                      (info (+ "EVAL ERROR: " e))
+                      [nil e]))
+                  data (if error
+                         {"error" error}
+                         {"result" (gjson/serialize result)})
+                  ]
+              (.sendMap
+               bc
+               (jsObj data)))))
+    (info "Connecting to server through BrowserChannel")
     (.setHandler bc handler)
     (.connect bc "channel/test" "channel/channel" (jsObj {}))))
 
@@ -86,6 +79,7 @@
 (defprotocol ^:extern AWidgetFactory
   (-dialog [_ argmap] "Create a dialog.")
   (-button [_ argmap] "Create a button.")
+  (-checkbox [_ argmap] "Create a checkbox")
   (-label [_ argmap] "Create a label.")
   (-text [_ argmap] "Create an editable text field."))
 
@@ -195,6 +189,14 @@
       (listen dlg :select on-select)) 
     ;; e.key would contain the key
     dlg))
+
+(defn ^:export checkbox
+  [& {:keys [text tooltip]
+      :or {text ""}
+      :as argmap}]
+  (let [btn (-checkbox (framework) {})]
+    (generic-configure! btn argmap) 
+    btn))
 
 (defn ^:export button
   ;; TODO: maybe this should be color-button instead?
@@ -306,5 +308,6 @@
     ;; (check-args (vector? selector) "selector must be vector")
     (let [root root ;; (to-widget root)
           result (sel/select root selector)
+          _ (debug "sel/select: " result)
           id? (and (nil? (second selector)) (sel/id-selector? (first selector)))]
       (if id? (first result) result))))

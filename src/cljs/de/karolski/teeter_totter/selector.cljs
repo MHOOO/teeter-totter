@@ -13,9 +13,11 @@
   https://github.com/cgrand/enlive
 
   There's no need to ever directly require this namespace. Use (teeter-totter.core/select)! "
-  (:use [clojure.string :only [split]])
+  (:use [clojure.string :only [split]]
+        [de.karolski.teeter-totter.util :only [debug]])
   (:require [de.karolski.teeter-totter.util :as ssu] 
-            [clojure.zip :as z]))
+            [clojure.zip :as z]
+            [goog.debug :as gdebug]))
 
 ; This code is the HTML selector code for Enlive with modifications to support
 ; selecting from a Swing widget hierarchy. Everything's been pretty much
@@ -315,9 +317,12 @@
 
 (defn- zip-select-nodes* [locs state]
   (letfn [(select1 [loc previous-state]
-            (when-let [state (step previous-state loc)]
-              (let [descendants (mapcat #(select1 % state) (children-locs loc))]
-                (if (accept-key state) (cons loc descendants) descendants))))]
+            ;; (debug "NODE: " (gdebug/expose (z/node loc)))
+            (when (not (nil? (z/node loc)))
+              (when-let [state (step previous-state loc)]
+                ;; (debug "STATE: " state)
+                (let [descendants (mapcat #(select1 % state) (children-locs loc))]
+                  (if (accept-key state) (cons loc descendants) descendants)))))]
     (mapcat #(select1 % state) locs)))
 
 (defn- select-nodes* [nodes selector]
@@ -361,6 +366,7 @@
   Returns the seq of nodes or fragments matched by the specified selector."
  [node-or-nodes selector]
   (let [nodes (as-nodes node-or-nodes)]
+    ;; (debug "Nodes: " (reduce pr-str (interpose ", " (map gdebug/expose nodes))))
     (if (node-selector? selector)
       (select-nodes* nodes selector)
       (select-fragments* nodes selector))))

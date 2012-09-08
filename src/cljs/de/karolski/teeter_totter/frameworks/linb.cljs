@@ -1,7 +1,7 @@
 (ns de.karolski.teeter-totter.frameworks.linb
   (:use [de.karolski.teeter-totter.core :only [PropertyChangeManager AConfigurable AConfigurableMap AWidgetFactory APanelFactory AEventBinder debug listen config config!]]
         [de.karolski.teeter-totter.bind :only [ToBindable]]
-        [de.karolski.teeter-totter.util :only [keywordize-map-keys stringify-map-keys clj->js Children ASimpleNameable AInstance class-for-name class-of]]
+        [de.karolski.teeter-totter.util :only [keywordize-map-keys stringify-map-keys clj->js Children ASimpleNameable AInstance class-for-name class-of debug]]
         [de.karolski.teeter-totter.selector :only [ASelectable]])
   (:require-macros [de.karolski.teeter-totter.util :as m])
   (:require
@@ -21,6 +21,8 @@
   (-dialog [_ argmap] (linb.UI.Dialog.))
   (-button [_ argmap] (doto (linb.UI.Button.)
                         (config! :selectable? false)))
+  (-checkbox [_ argmap] (doto (linb.UI.CheckBox.)
+                          (config! :selectable? false)))
   (-label [_ argmap] (doto (linb.UI.Label.)
                        (config! :selectable? false)))
   (-text [_ argmap] (linb.UI.Input.)) 
@@ -89,6 +91,7 @@
             #(.setDockMargin
               %1
               (c/jsObj (stringify-map-keys (merge (config %1 :margin) %2))))]
+   :enabled? [#(not (.getDisabled %)) #(.setDisabled %1 (not %2))]
    :listen [(fn [_] (throw (js/Error. "Not implemented")))
             #(apply listen %1 %2)]
    :selectable? [#(.getSelectable %) #(.setSelectable %1 %2)]
@@ -119,8 +122,6 @@
                    +linb-button-opt-map+)
   linb.UI.Label (-config-map [c]
                    +linb-label-opt-map+)
-  linb.UI.CheckBox (-config-map [c]
-                     +linb-button-opt-map+)
   linb.UI.Block (-config-map [c]
                    (merge +linb-label-opt-map+
                           {:border-type [#(.getBorderType %) #(.setBorderType %1 (name %2))]}))
@@ -150,9 +151,9 @@
 
 (extend-protocol ToBindable
   linb.UI.Button
-    (to-bindable* [this] (b/selection this))
+  (to-bindable* [this] (b/selection this))
   linb.UI.Label
-    (to-bindable* [this] (b/property this :text)))
+  (to-bindable* [this] (b/property this :text)))
 
 
 (extend-protocol Children
@@ -172,7 +173,7 @@
   linb does not do that itself!"
   [sub b]
   (doseq [key (reverse (js-keys (.-prototype b)))]
-    (c/debug (+ key " = "(_.str.startWith key "de$karolski$teeter_totter")))
+    (debug (+ key " = "(_.str.startWith key "de$karolski$teeter_totter")))
     (when (and (_.str.startWith key "de$karolski$teeter_totter")
                (not (aget (.-prototype sub) key)))
       (aset (.-prototype sub) key (aget (.-prototype b) key)))))
@@ -180,6 +181,7 @@
 
 (inherit-protocols linb.UI.Widget linb.UI)
 (inherit-protocols linb.UI.Button linb.UI.Widget)
+(inherit-protocols linb.UI.CheckBox linb.UI.Button)
 (inherit-protocols linb.UI.Dialog linb.UI.Widget)
 (inherit-protocols linb.UI.Input linb.UI.Widget)
 (inherit-protocols linb.UI.Label linb.UI.Widget)

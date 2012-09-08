@@ -1,4 +1,5 @@
 (ns de.karolski.teeter-totter.example
+  (:use [de.karolski.teeter-totter.util :only [debug]])
   (:require
    [de.karolski.teeter-totter.core :as c]
    [de.karolski.teeter-totter.bind :as b]
@@ -21,6 +22,10 @@
               [(c/horizontal-panel
                 :height 30
                 :margin {:top 5}
+                :items [(c/checkbox :id :cb :text "Enable?")])
+               (c/horizontal-panel
+                :height 30
+                :margin {:top 5}
                 :items [(c/label :text "Name")
                         (c/text :id :name :text "Joe Smith")])
                (c/horizontal-panel
@@ -31,14 +36,21 @@
                (c/horizontal-panel
                 :height 30
                 :margin {:top 5}
-                :items [(c/button :text "Push me!"
+                :items [(c/button
+                         :id :confirmbtn
+                         :text "Push me!"
                                   :tooltip "Not implemented"
                                   :color "green"
-                                  :listen [:action (fn [e] (c/debug "Button clicked!"))])])])
+                                  :listen [:action (fn [e] (debug "Button clicked!"))])])])
                     
-             )] 
-    (c/config! dlg :visible? true)
-    (c/debug "Selecting: " (c/config (c/select dlg [:#dialog]) :id))
+             )]
+    (debug "checkbox: " (c/select dlg [:#cb]))
+    ;; TODO: Button not found. select possibly only works on the first
+    ;; child of every elemement it visits, since moving the containing
+    ;; panel of the checkbox down does not find it either
+    (debug "button: " (c/select dlg [:#confirmbtn]))
+    (b/bind (c/select dlg [:#cb]) (b/property (c/select dlg [:#confirm-btn]) :enabled?))
+    (c/config! dlg :visible? true) 
     ))
 
 ;; (defn example2 []

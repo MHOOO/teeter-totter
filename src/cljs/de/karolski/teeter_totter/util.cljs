@@ -1,5 +1,14 @@
 (ns de.karolski.teeter-totter.util
-  (:use [clojure.string :only [split]]))
+  (:use [clojure.string :only [split]])
+  (:require [goog.debug.Logger :as glogger]))
+
+(let [log (glogger/getLogger "DEBUG")]
+ (defn ^:export debug [& args]
+   (.info log (reduce str "" args))))
+
+(let [log (glogger/getLogger "INFO")]
+ (defn ^:export info [& args]
+   (.info log (reduce str "" args))))
 
 (defprotocol AInstance
   (class-of* [_] "Returns the class (i.e. prototype) of the object."))

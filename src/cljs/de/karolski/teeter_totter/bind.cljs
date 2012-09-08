@@ -15,7 +15,8 @@
   de.karolski.teeter-totter.bind
   (:refer-clojure :exclude [filter some])
   (:use
-   [de.karolski.teeter-totter.core :only [framework -add-listener -remove-listener config!]]))
+   [de.karolski.teeter-totter.core :only [framework -add-listener -remove-listener config!]])
+  (:require [de.karolski.teeter-totter.core :as ssc]))
 
 (defn- remove-handler [handler handler-vec]
   (vec (remove #(= % handler) handler-vec)))
