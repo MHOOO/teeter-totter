@@ -35,7 +35,7 @@
                 :height 30
                 :margin {:top 5}
                 :items [(c/label :text "E-Mail")
-                        (c/text :text "Joe.Smith@template.com")])
+                        (c/text :id :email :text "Joe.Smith@template.com")])
                (c/horizontal-panel
                 :height 30
                 :margin {:top 5}
@@ -47,7 +47,11 @@
                                   :listen [:action (fn [e] (debug "Button clicked!"))])])])
                     
              )]
-    (b/bind (b/property (c/select dlg [:#cb]) :value) (b/property (c/select dlg [:#confirm-btn]) :enabled?))
+    (b/bind (b/property (c/select dlg [:#cb]) :value)
+            (b/tee
+             (b/property (c/select dlg [:#name]) :enabled?)
+             (b/property (c/select dlg [:#email]) :enabled?)
+             (b/property (c/select dlg [:#confirm-btn]) :enabled?)))
     (c/config! dlg :visible? true)
     (reset! +dialog+ dlg)
 
