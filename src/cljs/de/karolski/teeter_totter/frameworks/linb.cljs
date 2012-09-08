@@ -1,7 +1,7 @@
 (ns de.karolski.teeter-totter.frameworks.linb
   (:use [de.karolski.teeter-totter.core :only [PropertyChangeManager AConfigurable AConfigurableMap AWidgetFactory APanelFactory AEventBinder debug listen config config!]]
         [de.karolski.teeter-totter.bind :only [ToBindable]]
-        [de.karolski.teeter-totter.util :only [keywordize-map-keys stringify-map-keys clj->js Children ASimpleNameable AInstance class-for-name class-of debug]]
+        [de.karolski.teeter-totter.util :only [keywordize-map-keys stringify-map-keys clj->js Children ASimpleNameable AInstance class-for-name class-of debug get-simple-name]]
         [de.karolski.teeter-totter.selector :only [ASelectable]])
   (:require-macros [de.karolski.teeter-totter.util :as m])
   (:require
@@ -15,6 +15,50 @@
   {:text "value"
    :title "caption"
    :value "value"})
+
+(defn- property-change-default-fn
+  "This function is being called internally in order to propagate
+property-change events to teeter-totter users while keeping the linb
+event mechanism intact."
+  ([widget & [profile opt-name value old-value oldf :as args]]
+     (apply oldf widget (butlast args)))
+  ([widget f oldf]
+     (oldf widget
+           (fn [profile opt-name value old-value]
+             (debug "property change listener called for property: " opt-name " with args " profile " " opt-name " " value " " old-value)
+             ;; 2. ... call the user specified handler
+             (f profile opt-name value old-value)
+                     
+             ;; 3. then call any registered handlers
+             (if-let [handlers (get-in @(.-de$karolski$teeter_totter$frameworks$linb$-add-listener--listener-map
+                                         ;; (. profile (boxing)) returns the actual UI element
+                                         (. profile (boxing)))
+                                       [opt-name])]
+               (doseq [handler handlers]
+                 (handler value)))))))
+
+
+(defn- value-change-default-fn
+  "This function is being called internally in order to propagate
+value-change events to teeter-totter users while keeping the linb
+event mechanism intact."
+  ([widget & [profile value old-value oldf :as args]]
+     (apply oldf widget (butlast args)))
+  ([widget f oldf]
+     (oldf widget
+           (let [opt-name (property-kw->property-name :value)]
+            (fn [profile old-value value]
+              (debug "property change listener called for property: 'value' with args " profile " " opt-name " " value " " old-value)
+              ;; 2. ... call the user specified handler
+              (f profile old-value value)
+                     
+              ;; 3. then call any registered handlers
+              (if-let [handlers (get-in @(.-de$karolski$teeter_totter$frameworks$linb$-add-listener--listener-map
+                                          ;; (. profile (boxing)) returns the actual UI element
+                                          (. profile (boxing)))
+                                        [opt-name])]
+                (doseq [handler handlers]
+                  (handler value))))))))
 
 (extend-type Framework 
   AWidgetFactory 
@@ -42,31 +86,26 @@
   PropertyChangeManager
   (-add-listener [framework widget option-kw handler]
     (when (not (.-de$karolski$teeter_totter$frameworks$linb$-add-listener--listener-map widget))
+      ;; (debug "Installing custom property change listener on object with id " (config widget :id) " of class " (get-simple-name widget))
       ;; (linb.message "Setting up property change listener")
+
       ;; a potential outside user of the LINB Framework will no longer
       ;; be able to add a property change listener himself, so we have
       ;; to restore that functionality we do so by
       ;; 1. replace .afterPropertyChanged with our own function A
       (m/wrap widget.afterPropertyChanged [& args]
-              ;; (linb.message (+ "afterPropertyChanged wrapper called: " args))
-              (let [oldf (last args)
-                    args (butlast args)]
-                (this-as this
-                         (if (fn? (first args))
-                           (let [f (first args)]
-                             (oldf this (fn [profile opt-name value old-value]
-                                          ;; (linb.message (+ "property change listener called for property: " opt-name))
-                                          ;; 2. ... call the user specified handler
-                                          (f profile opt-name value old-value)
-                                          
-                                          ;; 3. then call any registered handlers
-                                          (if-let [handlers (get-in @(.-de$karolski$teeter_totter$frameworks$linb$-add-listener--listener-map
-                                                                      ;; (. profile (boxing)) returns the actual UI element
-                                                                      (. profile (boxing)))
-                                                                    [opt-name])]
-                                            (doseq [handler handlers]
-                                              (handler value))))))
-                           (apply oldf this args)))))
+              ;; args is either: [profile option-name oldv newv oldf] OR [function]
+              (this-as this (apply property-change-default-fn this args)))
+      (m/wrap widget.afterUIValueSet [& args]
+              ;; args is either: [profile oldv newv oldf] OR [function]
+              ;; (debug "ARGS: " (count args) ": " args)
+              (this-as this (apply value-change-default-fn this args)))
+
+      ;; make sure to call afterPropertyChanged with a dummy handler,
+      ;; this will activate the event
+      (. widget (afterPropertyChanged identity))
+      (. widget (afterUIValueSet identity))
+
       ;; initialize the listener-map
       (set! (.-de$karolski$teeter_totter$frameworks$linb$-add-listener--listener-map widget) (atom {})))
     (swap! (.-de$karolski$teeter_totter$frameworks$linb$-add-listener--listener-map widget)
@@ -79,7 +118,14 @@
 (extend-protocol AEventBinder
   linb.UI.Button
   (-bind-event [btn event-kw cb]
-    (cond (= event-kw :action) (.onClick btn cb))))
+    (cond (= event-kw :action) (.onClick btn cb)))
+
+  linb.UI.CheckBox
+  (-bind-event [btn event-kw cb]
+    (cond (or (= event-kw :action)
+              (= event-kw :value))
+          (do (debug "Registering callback for onChange event on CheckBox: " (config btn :id))
+              (.onChange btn cb)))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -162,7 +208,7 @@
 
 (extend-protocol ASimpleNameable
   linb.UI
-  (get-simple-name [this] (second (clojure.string/split (.-key this) #"\." 2))))
+  (get-simple-name [this] (second (clojure.string/split (.-KEY this) #"\." 2))))
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

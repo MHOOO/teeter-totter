@@ -1,6 +1,7 @@
 (ns de.karolski.teeter-totter.example
   (:use [de.karolski.teeter-totter.util :only [debug]])
   (:require
+   [goog.debug :as gdebug]
    [de.karolski.teeter-totter.core :as c]
    [de.karolski.teeter-totter.bind :as b]
    [de.karolski.teeter-totter.frameworks.google :as g]
@@ -10,6 +11,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Main program
+
+(def +dialog+ (atom nil))
 
 (defn example1 []
   (let [dlg (c/dialog
@@ -37,20 +40,19 @@
                 :height 30
                 :margin {:top 5}
                 :items [(c/button
-                         :id :confirmbtn
+                         :id :confirm-btn
                          :text "Push me!"
                                   :tooltip "Not implemented"
                                   :color "green"
                                   :listen [:action (fn [e] (debug "Button clicked!"))])])])
                     
              )]
-    (debug "checkbox: " (c/select dlg [:#cb]))
-    ;; TODO: Button not found. select possibly only works on the first
-    ;; child of every elemement it visits, since moving the containing
-    ;; panel of the checkbox down does not find it either
-    (debug "button: " (c/select dlg [:#confirmbtn]))
-    (b/bind (c/select dlg [:#cb]) (b/property (c/select dlg [:#confirm-btn]) :enabled?))
-    (c/config! dlg :visible? true) 
+    (b/bind (b/property (c/select dlg [:#cb]) :value) (b/property (c/select dlg [:#confirm-btn]) :enabled?))
+    (c/config! dlg :visible? true)
+    (reset! +dialog+ dlg)
+
+    (c/config! (c/select dlg [:#cb]) :value true)
+    (debug (gdebug/expose (c/select dlg [:#cb])))
     ))
 
 ;; (defn example2 []

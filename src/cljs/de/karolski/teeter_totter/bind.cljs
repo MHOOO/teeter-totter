@@ -94,8 +94,8 @@
           Bindable
             (subscribe [this handler] (subscribe target handler))
             (notify [this v] (notify first-source v))
-          cljs.core.IFn
-            (invoke [this] ;; TODO: invoke or -invoke?
+          IFn
+            (-invoke [this]
               (doseq [f unsubs] (f))))))))
 
 (defn funnel

@@ -30,8 +30,8 @@
 (defn ^:export setup-environment
   [& {:keys [debug?]}]
   (let [console (goog.debug.Console.)]
-    ;; remove stuff from browserchannel
-    ;; (.addFilter console "goog.net.BrowserChannel")
+    ;; remove log events from browserchannel
+    (.addFilter console "goog.net.BrowserChannel")
 
     (when debug?
       (.setCapturing console true))))
@@ -131,7 +131,6 @@
   [c argmap]
   (doseq [[k v] argmap]
     (when (k (config-map c))
-      (debug "Setting " k " to " v " on " c)
       (config! c k v))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -308,6 +307,5 @@
     ;; (check-args (vector? selector) "selector must be vector")
     (let [root root ;; (to-widget root)
           result (sel/select root selector)
-          _ (debug "sel/select: " result)
           id? (and (nil? (second selector)) (sel/id-selector? (first selector)))]
       (if id? (first result) result))))
